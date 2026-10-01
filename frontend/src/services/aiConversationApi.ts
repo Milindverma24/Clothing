@@ -24,7 +24,7 @@ export interface AiProductItem {
 export interface AiMessageItem {
   id: number;
   conversationId: number;
-  senderType: 'USER' | 'ASSISTANT' | 'SYSTEM';
+  senderType: 'USER' | 'ASSISTANT' | 'SYSTEM' | 'AGENT';
   content: string;
   intent?: string;
   modelName?: string;
@@ -170,3 +170,26 @@ export async function submitChatMessageFeedbackApi(
   });
   if (!res.ok) throw new Error('Failed to submit message feedback');
 }
+
+export async function sendAdminReplyApi(
+  conversationId: number,
+  message: string,
+  adminName?: string
+): Promise<AiMessageItem> {
+  const res = await fetch(`${API_BASE_URL}/admin/ai-conversations/${conversationId}/reply`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, adminName }),
+  });
+  if (!res.ok) throw new Error('Failed to send admin reply');
+  const json = await res.json();
+  return json.data;
+}
+
+export async function getCustomerChatHistoryApi(conversationId: number): Promise<AiConversationDetail> {
+  const res = await fetch(`${API_BASE_URL}/chat/history/${conversationId}`);
+  if (!res.ok) throw new Error('Failed to fetch customer chat history');
+  const json = await res.json();
+  return json.data;
+}
+

@@ -1,12 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   MessageSquare,
   Search,
   RefreshCw,
   Sparkles,
   FileText,
-  ThumbsUp,
-  ThumbsDown,
   Download,
   Archive,
   ChevronRight,
@@ -15,6 +13,11 @@ import {
   ArrowLeft,
   Loader2,
   CheckCircle2,
+  Send,
+  UserCheck,
+  BookOpen,
+  Info,
+  Clock,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '../../ui/Button';
@@ -23,12 +26,17 @@ import {
   getAiConversationDetailApi,
   getAiConversationStatsApi,
   updateConversationStatusApi,
+  sendAdminReplyApi,
   type AiConversationSummary,
   type AiConversationDetail,
   type AiConversationStats,
 } from '../../../services/aiConversationApi';
 
-export const AiConversationsView: React.FC<{ onNavigateToKnowledgeBase?: () => void }> = ({
+interface AiConversationsViewProps {
+  onNavigateToKnowledgeBase?: () => void;
+}
+
+export const AiConversationsView: React.FC<AiConversationsViewProps> = ({
   onNavigateToKnowledgeBase,
 }) => {
   const [conversations, setConversations] = useState<AiConversationSummary[]>([]);
@@ -38,18 +46,28 @@ export const AiConversationsView: React.FC<{ onNavigateToKnowledgeBase?: () => v
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [activeFilterTab, setActiveFilterTab] = useState<'ALL' | 'UNANSWERED' | 'ACTIVE' | 'ARCHIVED'>('ALL');
   const [dateRangeFilter, setDateRangeFilter] = useState('ALL');
-  const [intentFilter, setIntentFilter] = useState('ALL');
 
   // Loading states
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isSendingReply, setIsSendingReply] = useState(false);
 
-  // Expandable message trace states
+  // Human reply input state
+  const [replyText, setReplyText] = useState('');
+  const [showRightDrawer, setShowRightDrawer] = useState(false);
+
+  // Expandable trace states
   const [expandedTraceIds, setExpandedTraceIds] = useState<Record<number, boolean>>({});
   const [showMobileDetail, setShowMobileDetail] = useState(false);
+
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   const fetchConversationsAndStats = async () => {
     setIsLoadingList(true);
@@ -57,8 +75,7 @@ export const AiConversationsView: React.FC<{ onNavigateToKnowledgeBase?: () => v
       const [listData, statsData] = await Promise.all([
         getAiConversationsApi({
           search: searchQuery,
-          status: statusFilter,
-          intent: intentFilter,
+          status: activeFilterTab === 'UNANSWERED' ? 'ALL' : activeFilterTab,
           dateRange: dateRangeFilter,
           page: 0,
           size: 50,
@@ -66,12 +83,17 @@ export const AiConversationsView: React.FC<{ onNavigateToKnowledgeBase?: () => v
         getAiConversationStatsApi(),
       ]);
 
-      setConversations(listData.content);
+      let filteredContent = listData.content;
+      if (activeFilterTab === 'UNANSWERED') {
+        filteredContent = listData.content.filter((c) => c.hasUnanswered);
+      }
+
+      setConversations(filteredContent);
       setStats(statsData);
 
       // Select first conversation if none selected
-      if (!selectedConvId && listData.content.length > 0) {
-        setSelectedConvId(listData.content[0].id);
+      if (!selectedConvId && filteredContent.length > 0) {
+        setSelectedConvId(filteredContent[0].id);
       }
     } catch (err) {
       console.error('Failed to load conversations or stats:', err);
@@ -82,7 +104,7 @@ export const AiConversationsView: React.FC<{ onNavigateToKnowledgeBase?: () => v
 
   useEffect(() => {
     fetchConversationsAndStats();
-  }, [statusFilter, dateRangeFilter, intentFilter]);
+  }, [activeFilterTab, dateRangeFilter]);
 
   // Load detail whenever selectedConvId changes
   useEffect(() => {
@@ -96,6 +118,7 @@ export const AiConversationsView: React.FC<{ onNavigateToKnowledgeBase?: () => v
       try {
         const detail = await getAiConversationDetailApi(selectedConvId);
         setConversationDetail(detail);
+        setTimeout(scrollToBottom, 100);
       } catch (err) {
         console.error('Failed to load conversation detail:', err);
       } finally {
@@ -105,6 +128,50 @@ export const AiConversationsView: React.FC<{ onNavigateToKnowledgeBase?: () => v
 
     loadDetail();
   }, [selectedConvId]);
+
+  const handleSendAdminReply = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!selectedConvId || !replyText.trim() || isSendingReply) return;
+
+    const textToSend = replyText.trim();
+    setIsSendingReply(true);
+    try {
+      const newMsg = await sendAdminReplyApi(selectedConvId, textToSend, 'Support Team');
+      setReplyText('');
+
+      // Update detail transcript locally
+      if (conversationDetail && conversationDetail.id === selectedConvId) {
+        setConversationDetail({
+          ...conversationDetail,
+          hasUnanswered: false,
+          messageCount: conversationDetail.messageCount + 1,
+          messages: [...conversationDetail.messages, newMsg],
+        });
+      }
+
+      // Update conversation in list
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === selectedConvId
+            ? {
+                ...c,
+                hasUnanswered: false,
+                messageCount: c.messageCount + 1,
+                lastMessageText: textToSend,
+                lastSenderType: 'AGENT',
+                lastActivityAt: new Date().toISOString(),
+              }
+            : c
+        )
+      );
+
+      setTimeout(scrollToBottom, 100);
+    } catch (err) {
+      console.error('Failed to send admin reply:', err);
+    } finally {
+      setIsSendingReply(false);
+    }
+  };
 
   const toggleTrace = (messageId: number) => {
     setExpandedTraceIds((prev) => ({
@@ -133,356 +200,357 @@ export const AiConversationsView: React.FC<{ onNavigateToKnowledgeBase?: () => v
 
   const handleExport = (format: 'csv' | 'json') => {
     if (!selectedConvId) return;
-    window.open(`http://localhost:8080/api/admin/ai-conversations/${selectedConvId}/export?format=${format}`, '_blank');
+    window.open(
+      `http://localhost:8080/api/admin/ai-conversations/${selectedConvId}/export?format=${format}`,
+      '_blank'
+    );
+  };
+
+  const getAvatarColor = (name: string) => {
+    const colors = [
+      'bg-[#1a1a1a] text-white',
+      'bg-[#3b3b3b] text-white',
+      'bg-[#2d3748] text-white',
+      'bg-[#4a5568] text-white',
+      'bg-[#111827] text-white',
+    ];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  };
+
+  const formatRelativeTime = (isoString?: string) => {
+    if (!isoString) return '';
+    try {
+      const date = new Date(isoString);
+      const diffMs = Date.now() - date.getTime();
+      const diffMin = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMin / 60);
+      const diffDays = Math.floor(diffHours / 24);
+
+      if (diffMin < 1) return 'Just now';
+      if (diffMin < 60) return `${diffMin}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      if (diffDays === 1) return '1 day ago';
+      if (diffDays < 30) return `${diffDays}d ago`;
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    } catch {
+      return '';
+    }
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#e5e5e5]">
-        <div>
-          <span className="text-xs uppercase font-bold tracking-widest text-[#8a8a8a] block">
-            AI OBSERVABILITY & SUPPORT
-          </span>
-          <div className="flex items-center gap-3 mt-1">
-            <h1 className="text-2xl sm:text-3xl font-extrabold uppercase tracking-tight text-black">
-              AI Conversations
-            </h1>
-            <span className="px-3 py-1 bg-black text-white text-xs font-bold rounded-full">
-              {stats?.totalConversations ?? conversations.length} Sessions
-            </span>
-          </div>
-          <p className="text-xs text-[#5e5e5e] mt-1 font-medium">
-            Monitor real-time customer dialogues, inspect retrieved RAG citations, and verify product recommendations.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={fetchConversationsAndStats}
-            disabled={isLoadingList}
-            className="flex items-center gap-1.5"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoadingList ? 'animate-spin' : ''}`} />
-            <span>Refresh</span>
-          </Button>
-        </div>
-      </div>
-
-      {/* Top Stat Cards */}
+    <div className="space-y-4 animate-in fade-in duration-300">
+      {/* Top Telemetry Strip */}
       {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
-          <div className="bg-white p-4 rounded-2xl border border-[#e5e5e5] shadow-xs">
-            <span className="text-[11px] font-semibold text-[#8a8a8a] uppercase tracking-wider block">
-              Total Chats
-            </span>
-            <span className="text-xl font-extrabold text-black mt-1 block">
-              {stats.totalConversations}
-            </span>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="bg-white p-3.5 rounded-[16px] border border-[#e5e5e5] shadow-xs flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-wider block">
+                Total Conversations
+              </span>
+              <span className="text-xl font-black text-black">{stats.totalConversations}</span>
+            </div>
+            <div className="w-8 h-8 rounded-full bg-[#f4f4f4] flex items-center justify-center text-black">
+              <MessageSquare className="w-4 h-4" />
+            </div>
           </div>
 
-          <div className="bg-white p-4 rounded-2xl border border-[#e5e5e5] shadow-xs">
-            <span className="text-[11px] font-semibold text-[#8a8a8a] uppercase tracking-wider block">
-              Active Sessions
-            </span>
-            <span className="text-xl font-extrabold text-black mt-1 block">
-              {stats.activeConversations}
-            </span>
+          <div className="bg-white p-3.5 rounded-[16px] border border-[#e5e5e5] shadow-xs flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-wider block">
+                Needs Reply / Gaps
+              </span>
+              <span className="text-xl font-black text-amber-600">{stats.unansweredCount}</span>
+            </div>
+            <div className="w-8 h-8 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
+              <AlertTriangle className="w-4 h-4" />
+            </div>
           </div>
 
-          <div className="bg-white p-4 rounded-2xl border border-[#e5e5e5] shadow-xs">
-            <span className="text-[11px] font-semibold text-[#8a8a8a] uppercase tracking-wider block">
-              RAG Queries
-            </span>
-            <span className="text-xl font-extrabold text-black mt-1 block">
-              {stats.totalRagQueries}
-            </span>
+          <div className="bg-white p-3.5 rounded-[16px] border border-[#e5e5e5] shadow-xs flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-wider block">
+                RAG Queries
+              </span>
+              <span className="text-xl font-black text-black">{stats.totalRagQueries}</span>
+            </div>
+            <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+              <BookOpen className="w-4 h-4" />
+            </div>
           </div>
 
-          <div className="bg-white p-4 rounded-2xl border border-[#e5e5e5] shadow-xs">
-            <span className="text-[11px] font-semibold text-[#8a8a8a] uppercase tracking-wider block">
-              Catalog Searches
-            </span>
-            <span className="text-xl font-extrabold text-black mt-1 block">
-              {stats.totalProductSearches}
-            </span>
-          </div>
-
-          <div className="bg-white p-4 rounded-2xl border border-[#e5e5e5] shadow-xs">
-            <span className="text-[11px] font-semibold text-[#8a8a8a] uppercase tracking-wider block">
-              Avg Latency
-            </span>
-            <span className="text-xl font-extrabold text-black mt-1 block">
-              {stats.avgResponseLatencyMs} ms
-            </span>
-          </div>
-
-          <div className="bg-white p-4 rounded-2xl border border-[#e5e5e5] shadow-xs">
-            <span className="text-[11px] font-semibold text-[#8a8a8a] uppercase tracking-wider block">
-              Satisfaction
-            </span>
-            <span className="text-xl font-extrabold text-emerald-700 mt-1 block flex items-center gap-1">
-              <ThumbsUp className="w-3.5 h-3.5" />
-              {stats.satisfactionRate}%
-            </span>
+          <div className="bg-white p-3.5 rounded-[16px] border border-[#e5e5e5] shadow-xs flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-wider block">
+                Avg Response Latency
+              </span>
+              <span className="text-xl font-black text-black">{stats.avgResponseLatencyMs} ms</span>
+            </div>
+            <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
+              <Clock className="w-4 h-4" />
+            </div>
           </div>
         </div>
       )}
 
-      {/* Filter Toolbar */}
-      <div className="bg-white p-4 rounded-2xl border border-[#e5e5e5] shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            fetchConversationsAndStats();
-          }}
-          className="relative flex-1"
-        >
-          <Search className="w-4 h-4 text-[#8a8a8a] absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by customer name, email, topic, or question..."
-            className="w-full pl-9 pr-4 py-2 bg-[#f8f8f8] rounded-full text-xs text-black placeholder:text-[#8a8a8a] border border-[#e5e5e5] focus:outline-none focus:ring-1 focus:ring-black"
-          />
-        </form>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Status Filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 bg-[#f8f8f8] border border-[#e5e5e5] rounded-full text-xs font-semibold text-black focus:outline-none focus:ring-1 focus:ring-black"
-          >
-            <option value="ALL">All Statuses</option>
-            <option value="ACTIVE">Active</option>
-            <option value="CLOSED">Closed</option>
-            <option value="ARCHIVED">Archived</option>
-          </select>
-
-          {/* Intent Filter */}
-          <select
-            value={intentFilter}
-            onChange={(e) => setIntentFilter(e.target.value)}
-            className="px-3 py-2 bg-[#f8f8f8] border border-[#e5e5e5] rounded-full text-xs font-semibold text-black focus:outline-none focus:ring-1 focus:ring-black"
-          >
-            <option value="ALL">All Actions</option>
-            <option value="RAG_QUERY">RAG Knowledge</option>
-            <option value="PRODUCT_SEARCH">Product Search</option>
-            <option value="GREETING">General / ChitChat</option>
-          </select>
-
-          {/* Date Range Filter */}
-          <select
-            value={dateRangeFilter}
-            onChange={(e) => setDateRangeFilter(e.target.value)}
-            className="px-3 py-2 bg-[#f8f8f8] border border-[#e5e5e5] rounded-full text-xs font-semibold text-black focus:outline-none focus:ring-1 focus:ring-black"
-          >
-            <option value="ALL">All Time</option>
-            <option value="today">Today</option>
-            <option value="yesterday">Yesterday</option>
-            <option value="7days">Last 7 Days</option>
-            <option value="30days">Last 30 Days</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Main Monitoring Workspace (Dual Pane) */}
-      <div className="bg-white border border-[#e5e5e5] rounded-2xl shadow-sm overflow-hidden flex flex-col md:flex-row h-[720px]">
-        {/* Left Panel: Conversation List */}
+      {/* Main Messaging Layout Container */}
+      <div className="bg-white border border-[#e5e5e5] rounded-[20px] shadow-sm overflow-hidden flex flex-col md:flex-row h-[780px]">
+        {/* ========================================================
+            LEFT COLUMN: Messages & Conversation Channel List
+            (Inspired by Realtime-Chat messaging channel)
+           ======================================================== */}
         <div
-          className={`w-full md:w-80 lg:w-96 border-r border-[#e5e5e5] flex flex-col h-full bg-[#fafafa] ${
+          className={`w-full md:w-[360px] lg:w-[400px] border-r border-[#e5e5e5] flex flex-col bg-white flex-shrink-0 ${
             showMobileDetail ? 'hidden md:flex' : 'flex'
           }`}
         >
-          <div className="p-3 border-b border-[#e5e5e5] bg-white flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-black">
-              Dialogues ({conversations.length})
-            </span>
-            <span className="text-[11px] text-[#8a8a8a]">Sorted by activity</span>
+          {/* Header */}
+          <div className="p-4 border-b border-[#f4f4f4] flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-extrabold text-black tracking-tight">Messages</h2>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-[#f4f4f4] text-black font-bold">
+                {conversations.length}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={fetchConversationsAndStats}
+                className="w-8 h-8 rounded-full hover:bg-[#f4f4f4] flex items-center justify-center text-[#5e5e5e] hover:text-black transition-colors"
+                title="Refresh list"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isLoadingList ? 'animate-spin' : ''}`} />
+              </button>
+              <div className="w-8 h-8 rounded-full bg-black text-white text-xs font-bold flex items-center justify-center shadow-xs">
+                S
+              </div>
+            </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto divide-y divide-[#eeeeee]">
-            {isLoadingList && conversations.length === 0 ? (
-              <div className="p-8 text-center text-xs text-[#8a8a8a]">
-                <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2 text-black" />
-                <span>Loading conversations...</span>
+          {/* Search Box */}
+          <div className="px-4 py-3 border-b border-[#f4f4f4]">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                fetchConversationsAndStats();
+              }}
+              className="relative"
+            >
+              <Search className="w-4 h-4 text-[#8a8a8a] absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 bg-[#f4f4f4] border-0 rounded-[12px] text-xs text-black placeholder:text-[#8a8a8a] focus:outline-none focus:ring-1 focus:ring-black transition-all"
+              />
+            </form>
+          </div>
+
+          {/* Filter Pills */}
+          <div className="px-4 py-2.5 flex items-center gap-1.5 border-b border-[#f4f4f4] overflow-x-auto no-scrollbar">
+            {[
+              { id: 'ALL', label: 'All' },
+              {
+                id: 'UNANSWERED',
+                label: 'Needs Reply',
+                badge: stats?.unansweredCount && stats.unansweredCount > 0 ? stats.unansweredCount : undefined,
+              },
+              { id: 'ACTIVE', label: 'Active' },
+              { id: 'ARCHIVED', label: 'Archived' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveFilterTab(tab.id as any)}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 flex-shrink-0 ${
+                  activeFilterTab === tab.id
+                    ? 'bg-black text-white shadow-xs'
+                    : 'bg-[#f4f4f4] text-[#5e5e5e] hover:bg-[#e8e8e8] hover:text-black'
+                }`}
+              >
+                <span>{tab.label}</span>
+                {tab.badge !== undefined && (
+                  <span className="w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] flex items-center justify-center font-bold">
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            ))}
+
+            <select
+              value={dateRangeFilter}
+              onChange={(e) => setDateRangeFilter(e.target.value)}
+              className="ml-auto px-2.5 py-1 bg-[#f4f4f4] border-0 rounded-full text-[10px] font-bold text-black focus:outline-none focus:ring-1 focus:ring-black flex-shrink-0"
+            >
+              <option value="ALL">All Time</option>
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+              <option value="7days">Last 7d</option>
+              <option value="30days">Last 30d</option>
+            </select>
+          </div>
+
+          {/* Conversation Channel Items List */}
+          <div className="flex-1 overflow-y-auto divide-y divide-[#f8f8f8]">
+            {isLoadingList ? (
+              <div className="p-8 text-center">
+                <Loader2 className="w-6 h-6 animate-spin text-black mx-auto mb-2" />
+                <p className="text-xs text-[#8a8a8a] font-medium">Loading conversations...</p>
               </div>
             ) : conversations.length === 0 ? (
-              <div className="p-8 text-center text-xs text-[#8a8a8a]">
-                <MessageSquare className="w-6 h-6 mx-auto mb-2 text-[#cccccc]" />
-                <span>No conversations found matching filters.</span>
+              <div className="p-8 text-center space-y-2">
+                <div className="w-10 h-10 rounded-full bg-[#f4f4f4] text-[#8a8a8a] flex items-center justify-center mx-auto">
+                  <MessageSquare className="w-5 h-5" />
+                </div>
+                <p className="text-xs font-bold text-black uppercase">No conversations found</p>
+                <p className="text-[11px] text-[#8a8a8a]">
+                  Customer inquiries and chat dialogues will appear here.
+                </p>
               </div>
             ) : (
               conversations.map((conv) => {
                 const isSelected = conv.id === selectedConvId;
-                const initials = conv.userName
-                  .split(' ')
-                  .map((n) => n[0])
-                  .join('')
-                  .toUpperCase()
-                  .slice(0, 2);
+                const avatarColor = getAvatarColor(conv.userName || 'Customer');
+                const initial = conv.userName ? conv.userName[0].toUpperCase() : 'C';
 
                 return (
-                  <div
+                  <button
                     key={conv.id}
                     onClick={() => {
                       setSelectedConvId(conv.id);
                       setShowMobileDetail(true);
                     }}
-                    className={`p-3.5 transition-colors cursor-pointer text-left ${
+                    className={`w-full p-3.5 text-left flex items-start gap-3 transition-colors ${
                       isSelected
-                        ? 'bg-black text-white'
-                        : 'bg-white hover:bg-[#f4f4f4] text-black'
+                        ? 'bg-[#f4f4f4]'
+                        : 'hover:bg-[#fafafa]'
                     }`}
                   >
-                    <div className="flex items-start gap-3">
+                    {/* User Avatar */}
+                    <div className="relative flex-shrink-0">
                       <div
-                        className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                          isSelected ? 'bg-white text-black' : 'bg-black text-white'
-                        }`}
+                        className={`w-11 h-11 rounded-full ${avatarColor} flex items-center justify-center font-bold text-sm shadow-xs`}
                       >
-                        {initials || 'U'}
+                        {initial}
+                      </div>
+                      {conv.status === 'ACTIVE' && (
+                        <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white" />
+                      )}
+                    </div>
+
+                    {/* Content Preview */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <span className="text-xs font-bold text-black truncate">
+                          {conv.userName}
+                        </span>
+                        <span className="text-[10px] text-[#8a8a8a] flex-shrink-0 font-medium">
+                          {formatRelativeTime(conv.lastActivityAt)}
+                        </span>
                       </div>
 
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-1">
-                          <span
-                            className={`font-extrabold text-xs truncate ${
-                              isSelected ? 'text-white' : 'text-black'
-                            }`}
-                          >
-                            {conv.userName}
-                          </span>
-                          <span
-                            className={`text-[10px] whitespace-nowrap ${
-                              isSelected ? 'text-white/60' : 'text-[#8a8a8a]'
-                            }`}
-                          >
-                            {new Date(conv.lastActivityAt).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </span>
-                        </div>
+                      <p className="text-xs text-[#5e5e5e] truncate leading-snug">
+                        {conv.lastMessageText || conv.title}
+                      </p>
 
-                        <span
-                          className={`text-[11px] font-semibold truncate block mt-0.5 ${
-                            isSelected ? 'text-white/90' : 'text-[#444444]'
-                          }`}
-                        >
-                          {conv.title}
-                        </span>
-
-                        {conv.lastMessageText && (
-                          <p
-                            className={`text-[11px] truncate mt-1 ${
-                              isSelected ? 'text-white/70' : 'text-[#777777]'
-                            }`}
-                          >
-                            {conv.lastMessageText}
-                          </p>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        {conv.hasUnanswered && (
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-amber-100 text-amber-900 flex items-center gap-1">
+                            <AlertTriangle className="w-2.5 h-2.5 text-amber-700" />
+                            <span>Needs Reply</span>
+                          </span>
                         )}
-
-                        <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                          <span
-                            className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                              isSelected
-                                ? 'bg-white/20 text-white'
-                                : 'bg-[#f0f0f0] text-black border border-[#e0e0e0]'
-                            }`}
-                          >
-                            {conv.messageCount} msgs
+                        {conv.ragQueriesCount > 0 && (
+                          <span className="text-[10px] text-[#8a8a8a] flex items-center gap-0.5">
+                            <BookOpen className="w-2.5 h-2.5" />
+                            <span>{conv.ragQueriesCount} RAG</span>
                           </span>
-
-                          {conv.ragQueriesCount > 0 && (
-                            <span
-                              className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                                isSelected ? 'bg-white/20 text-white' : 'bg-[#eef2f6] text-[#1e40af]'
-                              }`}
-                            >
-                              RAG ({conv.ragQueriesCount})
-                            </span>
-                          )}
-
-                          {conv.productSearchesCount > 0 && (
-                            <span
-                              className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                                isSelected ? 'bg-white/20 text-white' : 'bg-[#f3f4f6] text-black'
-                              }`}
-                            >
-                              Products ({conv.productSearchesCount})
-                            </span>
-                          )}
-
-                          {conv.hasUnanswered && (
-                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#fef3f2] text-[#b42318] border border-[#fecdca] flex items-center gap-1">
-                              <AlertTriangle className="w-2.5 h-2.5" /> Gap
-                            </span>
-                          )}
-                        </div>
+                        )}
+                        <span className="text-[10px] text-[#8a8a8a]">
+                          {conv.messageCount} msgs
+                        </span>
                       </div>
                     </div>
-                  </div>
+                  </button>
                 );
               })
             )}
           </div>
         </div>
 
-        {/* Center Panel: Full Conversation Transcript */}
+        {/* ========================================================
+            RIGHT COLUMN: Channel Transcript & Live Agent Chatting
+           ======================================================== */}
         <div
-          className={`flex-1 flex flex-col h-full bg-[#fbfbfb] ${
-            !showMobileDetail ? 'hidden md:flex' : 'flex'
+          className={`flex-1 flex flex-col bg-[#fafafa] overflow-hidden ${
+            showMobileDetail ? 'flex' : 'hidden md:flex'
           }`}
         >
-          {isLoadingDetail ? (
-            <div className="flex-1 flex items-center justify-center text-xs text-[#8a8a8a]">
-              <Loader2 className="w-6 h-6 animate-spin mr-2 text-black" />
-              <span>Loading conversation transcript...</span>
-            </div>
-          ) : !conversationDetail ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-[#8a8a8a]">
-              <MessageSquare className="w-10 h-10 mb-3 text-[#d0d0d0]" />
-              <h3 className="font-bold text-sm text-black">No Conversation Selected</h3>
-              <p className="text-xs text-[#8a8a8a] mt-1 max-w-sm">
-                Select an interaction from the left panel to inspect the full chronological customer chat history and RAG traces.
-              </p>
+          {/* EMPTY STATE: Welcome Screen (Matches Realtime-Chat Reference) */}
+          {!selectedConvId || !conversationDetail ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white space-y-4">
+              <div className="w-20 h-20 rounded-full bg-black text-white text-3xl font-black flex items-center justify-center shadow-lg">
+                S
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-2xl font-black text-black tracking-tight">
+                  Welcome, <span className="underline decoration-black">Support Lead</span>
+                </h3>
+                <p className="text-xs text-[#5e5e5e] max-w-sm mx-auto leading-relaxed">
+                  Select a customer conversation from the left to inspect multi-turn transcripts,
+                  verify RAG knowledge citations, or reply directly as a live store agent.
+                </p>
+              </div>
+
+              {stats?.unansweredCount && stats.unansweredCount > 0 ? (
+                <div className="pt-2">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setActiveFilterTab('UNANSWERED')}
+                    className="rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-2"
+                  >
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Review {stats.unansweredCount} Unanswered Questions</span>
+                  </Button>
+                </div>
+              ) : null}
             </div>
           ) : (
             <>
-              {/* Transcript Top Bar */}
-              <div className="p-4 bg-white border-b border-[#e5e5e5] flex items-center justify-between gap-3">
+              {/* Channel Header */}
+              <div className="px-5 py-3.5 bg-white border-b border-[#e5e5e5] flex items-center justify-between gap-3 shadow-xs">
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setShowMobileDetail(false)}
-                    className="md:hidden p-1 text-black hover:bg-[#f4f4f4] rounded-full"
-                    title="Back to conversation list"
+                    className="md:hidden p-1.5 rounded-full hover:bg-[#f4f4f4] text-black"
                   >
                     <ArrowLeft className="w-4 h-4" />
                   </button>
 
-                  <div className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center font-bold text-xs flex-shrink-0">
-                    {conversationDetail.userName.slice(0, 2).toUpperCase()}
+                  <div
+                    className={`w-10 h-10 rounded-full ${getAvatarColor(
+                      conversationDetail.userName
+                    )} flex items-center justify-center font-bold text-sm shadow-xs flex-shrink-0`}
+                  >
+                    {conversationDetail.userName ? conversationDetail.userName[0].toUpperCase() : 'C'}
                   </div>
 
                   <div>
-                    <h2 className="text-sm font-extrabold uppercase tracking-tight text-black flex items-center gap-2">
-                      <span>{conversationDetail.userName}</span>
-                      <span
-                        className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase ${
-                          conversationDetail.status === 'ACTIVE'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-neutral-200 text-neutral-800'
-                        }`}
-                      >
-                        {conversationDetail.status}
-                      </span>
-                    </h2>
-                    <span className="text-[11px] text-[#777777] block">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-extrabold text-black">
+                        {conversationDetail.userName}
+                      </h3>
+                      {conversationDetail.hasUnanswered && (
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-amber-100 text-amber-900">
+                          Waiting for Support
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[11px] text-[#8a8a8a] block">
                       {conversationDetail.userEmail || `Session: ${conversationDetail.sessionId}`}
                     </span>
                   </div>
@@ -492,12 +560,23 @@ export const AiConversationsView: React.FC<{ onNavigateToKnowledgeBase?: () => v
                   <Button
                     variant="secondary"
                     size="sm"
+                    onClick={() => setShowRightDrawer(!showRightDrawer)}
+                    className="text-xs rounded-full h-8 px-3 border-[#e5e5e5] flex items-center gap-1.5"
+                    title="Toggle Session Details"
+                  >
+                    <Info className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Details</span>
+                  </Button>
+
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     onClick={() => handleExport('csv')}
-                    className="flex items-center gap-1.5 text-xs"
-                    title="Export transcript as CSV"
+                    className="text-xs rounded-full h-8 px-3 border-[#e5e5e5] flex items-center gap-1.5"
+                    title="Export CSV"
                   >
                     <Download className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Export CSV</span>
+                    <span className="hidden sm:inline">CSV</span>
                   </Button>
 
                   {conversationDetail.status === 'ACTIVE' ? (
@@ -506,8 +585,7 @@ export const AiConversationsView: React.FC<{ onNavigateToKnowledgeBase?: () => v
                       size="sm"
                       onClick={() => handleStatusChange('ARCHIVED')}
                       disabled={isUpdatingStatus}
-                      className="flex items-center gap-1.5 text-xs"
-                      title="Archive this dialogue"
+                      className="text-xs rounded-full h-8 px-3 border-[#e5e5e5] flex items-center gap-1.5"
                     >
                       <Archive className="w-3.5 h-3.5" />
                       <span className="hidden sm:inline">Archive</span>
@@ -518,8 +596,7 @@ export const AiConversationsView: React.FC<{ onNavigateToKnowledgeBase?: () => v
                       size="sm"
                       onClick={() => handleStatusChange('ACTIVE')}
                       disabled={isUpdatingStatus}
-                      className="flex items-center gap-1.5 text-xs"
-                      title="Reopen dialogue"
+                      className="text-xs rounded-full h-8 px-3 border-[#e5e5e5] flex items-center gap-1.5"
                     >
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       <span className="hidden sm:inline">Reopen</span>
@@ -528,128 +605,83 @@ export const AiConversationsView: React.FC<{ onNavigateToKnowledgeBase?: () => v
                 </div>
               </div>
 
-              {/* Messages Chronological Area */}
-              <div className="flex-1 p-5 overflow-y-auto space-y-4">
-                {conversationDetail.messages.map((msg) => {
-                  const isUser = msg.senderType === 'USER';
-                  const isTraceOpen = !!expandedTraceIds[msg.id];
+              {/* Main Transcript Message Bubbles */}
+              <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+                {isLoadingDetail ? (
+                  <div className="p-12 text-center">
+                    <Loader2 className="w-6 h-6 animate-spin text-black mx-auto mb-2" />
+                    <p className="text-xs text-[#8a8a8a]">Retrieving chronological transcript...</p>
+                  </div>
+                ) : (
+                  conversationDetail.messages.map((msg) => {
+                    const isUser = msg.senderType === 'USER';
+                    const isAgent = msg.senderType === 'AGENT';
+                    const isAssistant = msg.senderType === 'ASSISTANT';
 
-                  return (
-                    <div
-                      key={msg.id}
-                      className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
-                    >
-                      {/* Sender Indicator */}
-                      <span className="text-[10px] uppercase font-bold text-[#8a8a8a] mb-1 px-1">
-                        {isUser ? 'Customer' : 'Store Concierge (AI)'} •{' '}
-                        {new Date(msg.createdAt).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </span>
-
-                      {/* Bubble */}
+                    return (
                       <div
-                        className={`max-w-[85%] rounded-2xl px-4 py-3 text-xs leading-relaxed ${
-                          isUser
-                            ? 'bg-black text-white rounded-br-xs'
-                            : 'bg-white text-black border border-[#e5e5e5] rounded-bl-xs shadow-xs'
+                        key={msg.id}
+                        className={`flex flex-col ${
+                          isUser ? 'items-start' : isAgent ? 'items-end' : 'items-start'
                         }`}
                       >
-                        <p className="whitespace-pre-line font-medium">{msg.content}</p>
-                      </div>
+                        {/* Sender Label & Timestamp */}
+                        <div
+                          className={`flex items-center gap-2 mb-1 px-1 text-[11px] font-semibold text-[#8a8a8a] ${
+                            isAgent ? 'flex-row-reverse' : ''
+                          }`}
+                        >
+                          {isUser ? (
+                            <span>{conversationDetail.userName}</span>
+                          ) : isAgent ? (
+                            <span className="text-black font-bold flex items-center gap-1">
+                              <UserCheck className="w-3 h-3 text-black" />
+                              <span>{msg.modelName || 'Store Support Agent'}</span>
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-black font-bold">
+                              <Sparkles className="w-3 h-3 text-black" />
+                              <span>Store AI Assistant</span>
+                            </span>
+                          )}
+                          <span>•</span>
+                          <span>{formatRelativeTime(msg.createdAt)}</span>
+                        </div>
 
-                      {/* Assistant Additional Observability Details */}
-                      {!isUser && (
-                        <div className="mt-2 w-full max-w-[85%] space-y-2">
-                          {/* Processing Trace Accordion */}
-                          <div className="bg-white border border-[#e5e5e5] rounded-xl overflow-hidden">
-                            <button
-                              onClick={() => toggleTrace(msg.id)}
-                              className="w-full px-3 py-1.5 flex items-center justify-between text-[10px] font-bold text-[#555555] bg-[#f9f9f9] hover:bg-[#f2f2f2] transition-colors"
-                            >
-                              <div className="flex items-center gap-1.5">
-                                <Sparkles className="w-3 h-3 text-black" />
-                                <span>AI Processing Trace</span>
-                                <span className="font-semibold text-[#8a8a8a]">
-                                  ({msg.processingTimeMs ?? 0}ms • {msg.modelName || 'local-rag'})
-                                </span>
-                              </div>
-                              {isTraceOpen ? (
-                                <ChevronDown className="w-3.5 h-3.5" />
-                              ) : (
-                                <ChevronRight className="w-3.5 h-3.5" />
-                              )}
-                            </button>
+                        {/* Bubble Content */}
+                        <div
+                          className={`max-w-[85%] sm:max-w-[75%] rounded-[18px] p-4 text-xs shadow-xs space-y-3 ${
+                            isUser
+                              ? 'bg-white border border-[#e5e5e5] text-black rounded-tl-xs'
+                              : isAgent
+                              ? 'bg-black text-white rounded-tr-xs'
+                              : 'bg-white border border-[#e5e5e5] text-black rounded-tl-xs'
+                          }`}
+                        >
+                          <p className="leading-relaxed whitespace-pre-wrap font-normal">
+                            {msg.content}
+                          </p>
 
-                            {isTraceOpen && (
-                              <div className="p-3 bg-white space-y-2 text-[11px] border-t border-[#e5e5e5]">
-                                <div className="grid grid-cols-2 gap-2 text-neutral-600">
-                                  <div>
-                                    <span className="text-[#8a8a8a] block text-[9px] uppercase font-bold">
-                                      Detected Intent
-                                    </span>
-                                    <span className="font-bold text-black">{msg.intent || 'GENERAL'}</span>
-                                  </div>
-                                  <div>
-                                    <span className="text-[#8a8a8a] block text-[9px] uppercase font-bold">
-                                      Response Time
-                                    </span>
-                                    <span className="font-bold text-black">{msg.processingTimeMs ?? 0} ms</span>
-                                  </div>
-                                  <div>
-                                    <span className="text-[#8a8a8a] block text-[9px] uppercase font-bold">
-                                      Retrieved Chunks
-                                    </span>
-                                    <span className="font-bold text-black">
-                                      {msg.sources ? msg.sources.length : 0} chunks
-                                    </span>
-                                  </div>
-                                  <div>
-                                    <span className="text-[#8a8a8a] block text-[9px] uppercase font-bold">
-                                      Catalog Matches
-                                    </span>
-                                    <span className="font-bold text-black">
-                                      {msg.products ? msg.products.length : 0} items
-                                    </span>
-                                  </div>
-                                </div>
-
-                                {msg.errorStatus && (
-                                  <div className="mt-2 p-2 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg text-[10px]">
-                                    <span className="font-bold block">Status Note:</span>
-                                    <span>{msg.errorStatus}</span>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Grounded RAG Sources */}
-                          {msg.sources && msg.sources.length > 0 && (
-                            <div className="p-3 bg-white border border-[#e5e5e5] rounded-xl text-[11px] space-y-1.5">
-                              <span className="font-bold text-[10px] text-[#8a8a8a] uppercase tracking-wider block">
-                                Grounded RAG Knowledge Citations ({msg.sources.length})
+                          {/* RAG Knowledge Sources Chips */}
+                          {isAssistant && msg.sources && msg.sources.length > 0 && (
+                            <div className="pt-2 border-t border-[#f0f0f0] space-y-2">
+                              <span className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-wider block">
+                                Grounded RAG Citations ({msg.sources.length})
                               </span>
-                              <div className="space-y-1">
+                              <div className="flex flex-wrap gap-2">
                                 {msg.sources.map((src) => (
                                   <div
                                     key={src.id}
-                                    className="p-2 bg-[#f8f8f8] rounded-lg border border-[#e5e5e5]"
+                                    className="bg-[#f9f9f9] border border-[#e5e5e5] rounded-[10px] p-2 text-[10px] space-y-1"
                                   >
-                                    <div className="flex items-center justify-between font-bold text-black text-[11px]">
-                                      <div className="flex items-center gap-1.5">
-                                        <FileText className="w-3.5 h-3.5 text-black" />
-                                        <span>{src.documentName}</span>
-                                        <span className="font-normal text-[#8a8a8a]">• Page {src.pageNumber}</span>
-                                      </div>
-                                      <span className="text-[10px] bg-neutral-200 text-black px-1.5 py-0.5 rounded font-mono">
-                                        {Math.round(src.similarityScore * 100)}% match
-                                      </span>
+                                    <div className="flex items-center gap-1.5 font-bold text-black">
+                                      <FileText className="w-3 h-3 text-[#5e5e5e]" />
+                                      <span>{src.documentName}</span>
+                                      <span className="text-[#8a8a8a]">p.{src.pageNumber}</span>
                                     </div>
                                     {src.sourceExcerpt && (
-                                      <p className="text-[10px] text-[#555555] mt-1 italic line-clamp-2">
-                                        "{src.sourceExcerpt}"
+                                      <p className="text-[#5e5e5e] italic line-clamp-2">
+                                        “{src.sourceExcerpt}”
                                       </p>
                                     )}
                                   </div>
@@ -658,143 +690,234 @@ export const AiConversationsView: React.FC<{ onNavigateToKnowledgeBase?: () => v
                             </div>
                           )}
 
-                          {/* Catalog Products Triggered */}
-                          {msg.products && msg.products.length > 0 && (
-                            <div className="p-3 bg-white border border-[#e5e5e5] rounded-xl text-[11px] space-y-2">
-                              <span className="font-bold text-[10px] text-[#8a8a8a] uppercase tracking-wider block">
-                                Products Recommended from PostgreSQL Catalog ({msg.products.length})
+                          {/* Recommended Catalog Products */}
+                          {isAssistant && msg.products && msg.products.length > 0 && (
+                            <div className="pt-2 border-t border-[#f0f0f0] space-y-2">
+                              <span className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-wider block">
+                                Recommended Catalog Products
                               </span>
-                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                {msg.products.map((p) => (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {msg.products.map((prod) => (
                                   <Link
-                                    key={p.id}
-                                    to={`/products/${p.productSlug}`}
+                                    key={prod.id}
+                                    to={`/products/${prod.productSlug || prod.productId}`}
                                     target="_blank"
-                                    rel="noreferrer"
-                                    className="p-2 bg-[#f8f8f8] border border-[#e5e5e5] hover:border-black rounded-lg transition-all group block"
+                                    className="flex items-center gap-2.5 p-2 rounded-[10px] bg-[#f9f9f9] border border-[#e5e5e5] hover:border-black transition-colors"
                                   >
-                                    <div className="aspect-square bg-white rounded overflow-hidden mb-1">
+                                    <div className="w-9 h-9 rounded-md bg-white border border-[#e5e5e5] overflow-hidden flex-shrink-0">
                                       <img
-                                        src={p.imageUrl || '/images/15970.jpg'}
-                                        alt={p.productName}
-                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                        src={prod.imageUrl || '/images/15970.jpg'}
+                                        alt={prod.productName}
+                                        className="w-full h-full object-cover"
                                       />
                                     </div>
-                                    <span className="font-bold text-[10px] text-black line-clamp-1 group-hover:underline">
-                                      {p.productName}
-                                    </span>
-                                    <span className="text-[10px] font-semibold text-black block mt-0.5">
-                                      ₹{p.price?.toLocaleString('en-IN')}
-                                    </span>
+                                    <div className="min-w-0">
+                                      <h5 className="font-bold text-black text-[11px] truncate">
+                                        {prod.productName}
+                                      </h5>
+                                      {prod.price && (
+                                        <span className="text-[10px] text-[#5e5e5e] font-mono">
+                                          ₹{prod.price}
+                                        </span>
+                                      )}
+                                    </div>
                                   </Link>
                                 ))}
                               </div>
                             </div>
                           )}
 
-                          {/* Customer Feedback Pill */}
-                          {msg.isHelpful !== null && msg.isHelpful !== undefined && (
-                            <div className="flex items-center gap-1.5 text-[10px] font-semibold text-[#555555]">
-                              {msg.isHelpful ? (
-                                <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                                  <ThumbsUp className="w-3 h-3" /> Customer marked response helpful
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
-                                  <ThumbsDown className="w-3 h-3" /> Customer marked response unhelpful
-                                  {msg.feedbackComment && ` — "${msg.feedbackComment}"`}
-                                </span>
+                          {/* Technical AI Processing Trace Button */}
+                          {isAssistant && (
+                            <div className="pt-1 flex items-center justify-between text-[10px] text-[#8a8a8a]">
+                              <button
+                                onClick={() => toggleTrace(msg.id)}
+                                className="hover:text-black font-semibold flex items-center gap-1"
+                              >
+                                <span>AI Trace</span>
+                                {expandedTraceIds[msg.id] ? (
+                                  <ChevronDown className="w-3 h-3" />
+                                ) : (
+                                  <ChevronRight className="w-3 h-3" />
+                                )}
+                              </button>
+
+                              {msg.processingTimeMs !== undefined && msg.processingTimeMs > 0 && (
+                                <span>{msg.processingTimeMs} ms</span>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Expanded Trace Details */}
+                          {expandedTraceIds[msg.id] && (
+                            <div className="p-2.5 bg-[#f4f4f4] rounded-[8px] font-mono text-[10px] space-y-1 text-[#333]">
+                              <div>Intent: {msg.intent || 'RAG_QUERY'}</div>
+                              <div>Model: {msg.modelName || 'local-synthesizer'}</div>
+                              <div>Turn Latency: {msg.processingTimeMs || 0} ms</div>
+                              {msg.errorStatus && (
+                                <div className="text-amber-800 font-bold">
+                                  Gap: {msg.errorStatus}
+                                </div>
                               )}
                             </div>
                           )}
                         </div>
+                      </div>
+                    );
+                  })
+                )}
+
+                {/* If conversation has an unanswered question or missing context, show banner */}
+                {conversationDetail.hasUnanswered && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-[16px] p-4 text-xs space-y-2">
+                    <div className="flex items-center gap-2 font-bold text-amber-900">
+                      <AlertTriangle className="w-4 h-4 text-amber-700" />
+                      <span>Knowledge Gap Detected: AI Could Not Find Documented Answer</span>
+                    </div>
+                    <p className="text-amber-800 text-[11px] leading-relaxed">
+                      The AI Assistant did not find sufficient coverage in current PDF policy documents.
+                      You can reply directly below as a human support agent to answer {conversationDetail.userName} immediately.
+                    </p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <button
+                        onClick={() =>
+                          setReplyText(
+                            'Hello, yes we offer international shipping to Canada via DHL Express with tracking.'
+                          )
+                        }
+                        className="px-2.5 py-1 rounded-full bg-white text-amber-900 border border-amber-300 text-[10px] font-semibold hover:bg-amber-100 transition-colors"
+                      >
+                        + “Yes, we ship to Canada via DHL”
+                      </button>
+                      <button
+                        onClick={() =>
+                          setReplyText(
+                            'Our standard return window is 30 days from delivery. Return shipping is complimentary for exchanges.'
+                          )
+                        }
+                        className="px-2.5 py-1 rounded-full bg-white text-amber-900 border border-amber-300 text-[10px] font-semibold hover:bg-amber-100 transition-colors"
+                      >
+                        + “Our return window is 30 days”
+                      </button>
+                      {onNavigateToKnowledgeBase && (
+                        <button
+                          onClick={onNavigateToKnowledgeBase}
+                          className="px-2.5 py-1 rounded-full bg-amber-900 text-white text-[10px] font-semibold hover:bg-amber-800 transition-colors"
+                        >
+                          Upload PDF to Knowledge Base →
+                        </button>
                       )}
                     </div>
-                  );
-                })}
+                  </div>
+                )}
+
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* ========================================================
+                  HUMAN AGENT REPLY / CHAT INPUT BAR
+                  (Allows a person to reply directly into the RAG conversation)
+                 ======================================================== */}
+              <div className="p-3 md:p-4 bg-white border-t border-[#e5e5e5]">
+                <form onSubmit={handleSendAdminReply} className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      placeholder={`Reply as Store Support Agent to ${conversationDetail.userName}...`}
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      disabled={isSendingReply}
+                      className="w-full pl-4 pr-10 py-3 bg-[#f4f4f4] border-0 rounded-full text-xs text-black placeholder:text-[#8a8a8a] focus:outline-none focus:ring-1 focus:ring-black transition-all"
+                    />
+                  </div>
+
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    disabled={!replyText.trim() || isSendingReply}
+                    className="rounded-full w-10 h-10 p-0 flex items-center justify-center flex-shrink-0 bg-black text-white hover:bg-[#222]"
+                    title="Send Reply"
+                  >
+                    {isSendingReply ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    ) : (
+                      <Send className="w-4 h-4 text-white" />
+                    )}
+                  </Button>
+                </form>
+                <div className="flex items-center justify-between px-2 pt-2 text-[10px] text-[#8a8a8a]">
+                  <span>
+                    Your reply will be delivered directly into {conversationDetail.userName}'s chat session.
+                  </span>
+                  <span>Press Enter to send</span>
+                </div>
               </div>
             </>
           )}
         </div>
 
-        {/* Right Panel: Conversation Metadata Inspector Drawer */}
-        {conversationDetail && (
-          <div className="hidden xl:flex w-72 border-l border-[#e5e5e5] bg-white p-5 flex-col justify-between overflow-y-auto h-full text-xs">
-            <div className="space-y-5">
-              <div>
-                <span className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-wider block mb-1">
-                  Customer Profile
-                </span>
-                <div className="p-3 bg-[#fafafa] rounded-xl border border-[#e5e5e5] space-y-1.5">
-                  <span className="font-extrabold text-xs text-black block">
-                    {conversationDetail.userName}
-                  </span>
-                  <span className="text-[11px] text-[#666666] block">
-                    {conversationDetail.userEmail || 'No email provided (Guest)'}
-                  </span>
-                  <span className="text-[10px] font-mono text-[#8a8a8a] block truncate">
-                    ID: {conversationDetail.sessionId}
-                  </span>
-                </div>
-              </div>
-
-              <div>
-                <span className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-wider block mb-1">
-                  Session Metrics
-                </span>
-                <div className="p-3 bg-[#fafafa] rounded-xl border border-[#e5e5e5] space-y-2 text-[11px]">
-                  <div className="flex justify-between">
-                    <span className="text-[#777777]">Started:</span>
-                    <span className="font-bold text-black">
-                      {new Date(conversationDetail.startedAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#777777]">Messages:</span>
-                    <span className="font-bold text-black">{conversationDetail.messageCount}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#777777]">RAG Questions:</span>
-                    <span className="font-bold text-black">{conversationDetail.ragQueriesCount}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#777777]">Product Queries:</span>
-                    <span className="font-bold text-black">
-                      {conversationDetail.productSearchesCount}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {conversationDetail.hasUnanswered && (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2 text-[11px] text-amber-900">
-                  <div className="flex items-center gap-1.5 font-bold">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-700" />
-                    <span>Knowledge Base Gap</span>
-                  </div>
-                  <p className="text-[10px] text-amber-800">
-                    The AI lacked sufficient documentation to answer one or more questions in this dialogue.
-                  </p>
-                  {onNavigateToKnowledgeBase && (
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={onNavigateToKnowledgeBase}
-                      className="w-full text-[10px] py-1.5"
-                    >
-                      Upload Missing PDF
-                    </Button>
-                  )}
-                </div>
-              )}
+        {/* ========================================================
+            RIGHT INSPECTOR DRAWER (Collapsible Details)
+           ======================================================== */}
+        {showRightDrawer && conversationDetail && (
+          <div className="w-80 border-l border-[#e5e5e5] bg-white p-5 space-y-6 overflow-y-auto flex-shrink-0 animate-in slide-in-from-right duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-[#f4f4f4]">
+              <h4 className="text-xs font-bold text-black uppercase tracking-wider">
+                Conversation Details
+              </h4>
+              <button
+                onClick={() => setShowRightDrawer(false)}
+                className="text-xs font-bold text-[#8a8a8a] hover:text-black"
+              >
+                Close
+              </button>
             </div>
 
-            <div className="pt-4 border-t border-[#f0f0f0] space-y-2">
+            <div className="space-y-3">
+              <div>
+                <span className="text-[10px] font-bold text-[#8a8a8a] uppercase block">User</span>
+                <span className="text-xs font-bold text-black">{conversationDetail.userName}</span>
+              </div>
+
+              <div>
+                <span className="text-[10px] font-bold text-[#8a8a8a] uppercase block">Email</span>
+                <span className="text-xs text-black font-mono">
+                  {conversationDetail.userEmail || 'Anonymous Guest'}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[10px] font-bold text-[#8a8a8a] uppercase block">
+                  Session ID
+                </span>
+                <span className="text-[11px] text-[#5e5e5e] font-mono break-all">
+                  {conversationDetail.sessionId}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[10px] font-bold text-[#8a8a8a] uppercase block">Status</span>
+                <span className="inline-block mt-0.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#f4f4f4] text-black">
+                  {conversationDetail.status}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[10px] font-bold text-[#8a8a8a] uppercase block">
+                  Total Messages
+                </span>
+                <span className="text-xs font-bold text-black">
+                  {conversationDetail.messageCount} turns
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-[#f4f4f4] space-y-2">
               <Button
                 variant="secondary"
                 size="sm"
                 onClick={() => handleExport('json')}
-                className="w-full text-xs"
+                className="w-full text-xs rounded-full"
               >
                 Download JSON Transcript
               </Button>

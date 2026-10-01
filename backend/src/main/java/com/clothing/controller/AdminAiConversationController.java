@@ -64,6 +64,23 @@ public class AdminAiConversationController {
     }
 
     /**
+     * Sends a human administrator / support agent reply into the conversation.
+     * Allows support personnel to answer questions when RAG has insufficient context,
+     * or conduct live person-to-person support.
+     * POST /api/admin/ai-conversations/{id}/reply
+     */
+    @PostMapping("/{id}/reply")
+    public ResponseEntity<ApiResponse<AiMessageDTO>> sendAdminReply(
+            @PathVariable Long id,
+            @RequestBody AdminReplyRequestDTO request) {
+
+        AiMessageDTO reply = aiConversationService.sendAdminReply(
+                id, request.getMessage(), request.getAdminName()
+        );
+        return ResponseEntity.ok(ApiResponse.ok(reply));
+    }
+
+    /**
      * Returns all RAG knowledge sources cited in this conversation.
      * GET /api/admin/ai-conversations/{id}/sources
      */

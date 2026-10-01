@@ -1,13 +1,27 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, X, Send, Sparkles, FileText, Loader2, RotateCcw, ThumbsUp, ThumbsDown, Check } from 'lucide-react';
+import {
+  MessageSquare,
+  X,
+  Send,
+  Sparkles,
+  FileText,
+  Loader2,
+  RotateCcw,
+  ThumbsUp,
+  ThumbsDown,
+  Check,
+  User,
+  UserCheck,
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { sendChatMessageApi, type ChatResponseData, type CitationSourceItem, type ChatProductItem } from '../../services/ragChatApi';
-import { submitChatMessageFeedbackApi } from '../../services/aiConversationApi';
+import { submitChatMessageFeedbackApi, getCustomerChatHistoryApi } from '../../services/aiConversationApi';
 
 interface Message {
   id: string;
   dbMessageId?: number;
-  sender: 'user' | 'assistant';
+  sender: 'user' | 'assistant' | 'agent';
+  agentName?: string;
   text: string;
   sources?: CitationSourceItem[];
   products?: ChatProductItem[];
@@ -55,6 +69,42 @@ export const ChatbotWidget: React.FC = () => {
       setTimeout(() => inputRef.current?.focus(), 150);
     }
   }, [isOpen, messages]);
+
+  // Periodic polling for live human agent replies when chat is open
+  useEffect(() => {
+    if (!isOpen || !conversationId) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const detail = await getCustomerChatHistoryApi(conversationId);
+        if (detail && detail.messages && detail.messages.length > 0) {
+          setMessages((prev) => {
+            const existingDbIds = new Set(prev.map((m) => m.dbMessageId).filter(Boolean));
+            const newAgentMessages = detail.messages.filter(
+              (m) => m.senderType === 'AGENT' && !existingDbIds.has(m.id)
+            );
+
+            if (newAgentMessages.length === 0) return prev;
+
+            const mapped = newAgentMessages.map((m) => ({
+              id: `agent-${m.id}`,
+              dbMessageId: m.id,
+              sender: 'agent' as const,
+              agentName: m.modelName || 'Store Support Agent',
+              text: m.content,
+              timestamp: new Date(m.createdAt),
+            }));
+
+            return [...prev, ...mapped];
+          });
+        }
+      } catch {
+        // silent polling catch
+      }
+    }, 3500);
+
+    return () => clearInterval(interval);
+  }, [isOpen, conversationId]);
 
   const handleResetChat = () => {
     setConversationId(null);
@@ -200,18 +250,59 @@ export const ChatbotWidget: React.FC = () => {
             {messages.map((msg) => (
               <div
                 key={msg.id}
-                className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
+                className={`flex flex-col ${
+                  msg.sender === 'user'
+                    ? 'items-end'
+                    : msg.sender === 'agent'
+                    ? 'items-start'
+                    : 'items-start'
+                }`}
               >
+                {/* Agent Header Badge */}
+                {msg.sender === 'agent' && (
+                  <div className="flex items-center gap-1.5 mb-1 px-1">
+                    <div className="w-4 h-4 rounded-full bg-black text-white text-[9px] font-bold flex items-center justify-center">
+                      <UserCheck className="w-2.5 h-2.5" />
+                    </div>
+                    <span className="text-[11px] font-bold text-black">
+                      {msg.agentName || 'Store Support Team'}
+                    </span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold uppercase tracking-wider">
+                      Live Agent
+                    </span>
+                  </div>
+                )}
+
                 {/* Text Bubble */}
                 <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-3 leading-relaxed ${
+                  className={`max-w-[85%] rounded-2xl px-4 py-3 leading-relaxed text-xs ${
                     msg.sender === 'user'
                       ? 'bg-black text-white rounded-br-none shadow-sm'
+                      : msg.sender === 'agent'
+                      ? 'bg-neutral-900 text-white rounded-bl-none shadow-md border border-black'
                       : 'bg-white text-black border border-[#e5e5e5] rounded-bl-none shadow-xs'
                   }`}
                 >
                   <p className="whitespace-pre-line">{msg.text}</p>
                 </div>
+
+                {/* Optional "Talk to Human Support" helper when AI is uncertain */}
+                {msg.sender === 'assistant' &&
+                  (msg.text.toLowerCase().includes("couldn't find that information") ||
+                    msg.text.toLowerCase().includes('do not have sufficient') ||
+                    msg.text.toLowerCase().includes('not covered in our')) && (
+                    <div className="mt-2">
+                      <button
+                        onClick={() =>
+                          handleSendMessage('Could a store support agent please help me with this inquiry?')
+                        }
+                        className="px-3 py-1.5 rounded-full bg-black text-white text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 hover:bg-[#333] transition-colors shadow-xs"
+                      >
+                        <User className="w-3 h-3 text-white" />
+                        <span>Request Store Support Agent</span>
+                      </button>
+                    </div>
+                  )}
 
                 {/* Grounded Citation Sources */}
                 {msg.sources && msg.sources.length > 0 && (

@@ -178,4 +178,31 @@ class AiConversationServiceTest {
         assertEquals(650.0, stats.getAvgResponseLatencyMs());
         assertEquals(15L, stats.getHelpfulCount());
     }
+
+    @Test
+    @DisplayName("sendAdminReply successfully persists agent message and marks conversation resolved")
+    void testSendAdminReply() {
+        mockConversation.setHasUnanswered(true);
+        when(conversationRepository.findById(10L)).thenReturn(Optional.of(mockConversation));
+        when(messageRepository.save(any(AiMessage.class))).thenAnswer(invocation -> {
+            AiMessage m = invocation.getArgument(0);
+            m.setId(201L);
+            return m;
+        });
+
+        AiMessageDTO replyDTO = aiConversationService.sendAdminReply(
+                10L,
+                "Hello, yes we offer delivery to Canada via DHL Express.",
+                "Milind (Support Lead)"
+        );
+
+        assertNotNull(replyDTO);
+        assertEquals(201L, replyDTO.getId());
+        assertEquals("AGENT", replyDTO.getSenderType());
+        assertEquals("Hello, yes we offer delivery to Canada via DHL Express.", replyDTO.getContent());
+        assertEquals("Milind (Support Lead)", replyDTO.getModelName());
+        assertFalse(mockConversation.getHasUnanswered());
+        assertEquals(1, mockConversation.getMessageCount());
+        verify(conversationRepository).save(mockConversation);
+    }
 }

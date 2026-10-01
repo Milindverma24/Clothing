@@ -288,6 +288,39 @@ public class AiConversationService {
     }
 
     /**
+     * Sends an admin/support agent response directly into the conversation.
+     * This allows a human agent to answer questions that RAG could not answer,
+     * or take over and chat with the customer in real-time.
+     */
+    @Transactional
+    public AiMessageDTO sendAdminReply(Long conversationId, String adminMessage, String adminName) {
+        AiConversation conv = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("AiConversation", "id", conversationId));
+
+        int nextSeq = conv.getMessageCount() + 1;
+
+        AiMessage msg = new AiMessage();
+        msg.setConversation(conv);
+        msg.setSenderType("AGENT");
+        msg.setContent(adminMessage);
+        msg.setIntent("HUMAN_AGENT_REPLY");
+        msg.setModelName(adminName != null && !adminName.isBlank() ? adminName : "Store Support Agent");
+        msg.setProcessingTimeMs(0L);
+        msg.setSequenceNumber(nextSeq);
+        msg.setCreatedAt(LocalDateTime.now());
+
+        AiMessage saved = messageRepository.save(msg);
+
+        conv.setMessageCount(nextSeq);
+        conv.setLastActivityAt(LocalDateTime.now());
+        conv.setHasUnanswered(false); // human intervention answers the knowledge gap
+        conv.setStatus("ACTIVE");
+        conversationRepository.save(conv);
+
+        return mapToMessageDTO(saved);
+    }
+
+    /**
      * Retrieves unanswered questions where AI had insufficient context or failed.
      */
     @Transactional(readOnly = true)
