@@ -20,6 +20,7 @@ public class ProductAwareChatbotService {
     private final RagService ragService;
     private final AiService aiService;
     private final ProductSearchService productSearchService;
+    private final AiConversationService aiConversationService;
 
     private static final Set<String> PRODUCT_INTENT_KEYWORDS = Set.of(
             "product", "products", "shirt", "shirts", "tshirt", "tshirts", "tee", "shoes", "shoe",
@@ -38,80 +39,125 @@ public class ProductAwareChatbotService {
     public ProductAwareChatbotService(
             RagService ragService,
             AiService aiService,
-            ProductSearchService productSearchService) {
+            ProductSearchService productSearchService,
+            AiConversationService aiConversationService) {
         this.ragService = ragService;
         this.aiService = aiService;
         this.productSearchService = productSearchService;
+        this.aiConversationService = aiConversationService;
+    }
+
+    public ChatResponseDTO processChat(String message) {
+        return processChat(message, null, null, null, null);
     }
 
     /**
-     * Processes customer chat message with intelligent intent routing.
+     * Processes customer chat message with intelligent intent routing and database-backed conversation history.
      */
-    public ChatResponseDTO processChat(String message) {
+    public ChatResponseDTO processChat(
+            String message,
+            Long conversationId,
+            String sessionId,
+            String userName,
+            String userEmail) {
+
+        long startTime = System.currentTimeMillis();
+
         if (message == null || message.isBlank()) {
             return new ChatResponseDTO("Please enter a question or search for clothing pieces.");
         }
+
+        // 1. Resolve or establish conversation session
+        com.clothing.entity.AiConversation conv = aiConversationService.getOrCreateConversation(
+                conversationId, sessionId, userName, userEmail, message
+        );
 
         String lower = message.toLowerCase().trim();
 
         boolean hasKnowledgeIntent = containsAny(lower, KNOWLEDGE_INTENT_KEYWORDS);
         boolean hasProductIntent = containsAny(lower, PRODUCT_INTENT_KEYWORDS);
 
+        String answer;
+        List<CitationSource> sources = new ArrayList<>();
+        List<ProductSearchDTO> products = new ArrayList<>();
+        String intent;
+        String modelName = "local-rag-synthesizer";
+        String errorStatus = null;
+
         // Case 1: Hybrid inquiry (e.g. "What is your return policy for black shirts?")
         if (hasKnowledgeIntent && hasProductIntent) {
             log.info("Handling HYBRID intent chat query: '{}'", message);
+            intent = "HYBRID";
             List<RetrievedChunk> chunks = ragService.retrieveRelevantChunks(message, 3);
             AiService.GroundedResult grounded = aiService.generateGroundedAnswer(message, chunks);
+            answer = grounded.answer;
+            sources = grounded.sources;
 
             // Clean query for product search
             String productSubQuery = extractProductTerms(lower);
             SearchResponseDTO searchRes = productSearchService.search(
                     productSubQuery, null, null, null, null, null, null, null, null, 0, 3, "recommended"
             );
-
-            return new ChatResponseDTO(
-                    grounded.answer,
-                    grounded.sources,
-                    searchRes.getContent(),
-                    "HYBRID"
-            );
+            products = searchRes.getContent();
         }
-
         // Case 2: Pure Product Search inquiry (e.g. "Do you have navy blue casual shirts?", "show me white shoes")
-        if (hasProductIntent && !hasKnowledgeIntent) {
+        else if (hasProductIntent && !hasKnowledgeIntent) {
             log.info("Handling PRODUCT_SEARCH intent chat query: '{}'", message);
+            intent = "PRODUCT_SEARCH";
             String productTerms = extractProductTerms(lower);
             SearchResponseDTO searchRes = productSearchService.search(
                     productTerms, null, null, null, null, null, null, null, null, 0, 4, "recommended"
             );
 
-            List<ProductSearchDTO> products = searchRes.getContent();
-            String answer;
+            products = searchRes.getContent();
             if (products.isEmpty() || searchRes.isFallback()) {
                 answer = "I couldn't find exact pieces for '" + message + "', but here are some popular styles from our collection:";
             } else {
                 answer = "Here are " + products.size() + " pieces matching your search:";
             }
+        }
+        // Case 3: Knowledge Base inquiry (e.g. "What is your return policy?", "How long does shipping take?")
+        else {
+            log.info("Handling KNOWLEDGE intent chat query: '{}'", message);
+            intent = "KNOWLEDGE";
+            List<RetrievedChunk> chunks = ragService.retrieveRelevantChunks(message, 4);
+            AiService.GroundedResult grounded = aiService.generateGroundedAnswer(message, chunks);
+            answer = grounded.answer;
+            sources = grounded.sources;
 
-            return new ChatResponseDTO(
-                    answer,
-                    new ArrayList<>(),
-                    products,
-                    "PRODUCT_SEARCH"
-            );
+            if (chunks.isEmpty() || answer.toLowerCase().contains("couldn't find that information")) {
+                errorStatus = "INSUFFICIENT_KNOWLEDGE_CONTEXT";
+            }
         }
 
-        // Case 3: Knowledge Base inquiry (e.g. "What is your return policy?", "How long does shipping take?")
-        log.info("Handling KNOWLEDGE intent chat query: '{}'", message);
-        List<RetrievedChunk> chunks = ragService.retrieveRelevantChunks(message, 4);
-        AiService.GroundedResult grounded = aiService.generateGroundedAnswer(message, chunks);
+        long latencyMs = System.currentTimeMillis() - startTime;
 
-        return new ChatResponseDTO(
-                grounded.answer,
-                grounded.sources,
-                new ArrayList<>(),
-                "KNOWLEDGE"
+        // 2. Persist conversational turn to PostgreSQL
+        AiConversationService.TurnResult turn = aiConversationService.recordTurn(
+                conv,
+                message,
+                answer,
+                intent,
+                sources,
+                products,
+                latencyMs,
+                modelName,
+                errorStatus
         );
+
+        ChatResponseDTO responseDTO = new ChatResponseDTO(
+                answer,
+                sources,
+                products,
+                intent
+        );
+        responseDTO.setConversationId(turn.conversationId());
+        responseDTO.setUserMessageId(turn.userMessageId());
+        responseDTO.setMessageId(turn.assistantMessageId());
+        responseDTO.setProcessingTimeMs(latencyMs);
+        responseDTO.setModelName(modelName);
+
+        return responseDTO;
     }
 
     private boolean containsAny(String text, Set<String> keywords) {

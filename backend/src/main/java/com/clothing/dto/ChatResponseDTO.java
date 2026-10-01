@@ -8,6 +8,11 @@ public class ChatResponseDTO {
     private List<CitationSource> sources = new ArrayList<>();
     private List<ProductSearchDTO> products = new ArrayList<>();
     private String intent = "KNOWLEDGE";
+    private Long conversationId;
+    private Long messageId;
+    private Long userMessageId;
+    private Long processingTimeMs = 0L;
+    private String modelName;
 
     public ChatResponseDTO() {}
 
@@ -33,4 +38,20 @@ public class ChatResponseDTO {
 
     public String getIntent() { return intent; }
     public void setIntent(String intent) { this.intent = intent; }
+
+    public Long getConversationId() { return conversationId; }
+    public void setConversationId(Long conversationId) { this.conversationId = conversationId; }
+
+    public Long getMessageId() { return messageId; }
+    public void setMessageId(Long messageId) { this.messageId = messageId; }
+
+    public Long getUserMessageId() { return userMessageId; }
+    public void setUserMessageId(Long userMessageId) { this.userMessageId = userMessageId; }
+
+    public Long getProcessingTimeMs() { return processingTimeMs; }
+    public void setProcessingTimeMs(Long processingTimeMs) { this.processingTimeMs = processingTimeMs; }
+
+    public String getModelName() { return modelName; }
+    public void setModelName(String modelName) { this.modelName = modelName; }
 }
+

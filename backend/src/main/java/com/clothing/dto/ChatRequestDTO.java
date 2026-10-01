@@ -9,7 +9,13 @@ public class ChatRequestDTO {
     @Size(max = 1000, message = "Message must not exceed 1000 characters")
     private String message;
 
-    private String conversationId;
+    private Long conversationId;
+
+    private String sessionId;
+
+    private String userName;
+
+    private String userEmail;
 
     public ChatRequestDTO() {}
 
@@ -20,6 +26,16 @@ public class ChatRequestDTO {
     public String getMessage() { return message; }
     public void setMessage(String message) { this.message = message; }
 
-    public String getConversationId() { return conversationId; }
-    public void setConversationId(String conversationId) { this.conversationId = conversationId; }
+    public Long getConversationId() { return conversationId; }
+    public void setConversationId(Long conversationId) { this.conversationId = conversationId; }
+
+    public String getSessionId() { return sessionId; }
+    public void setSessionId(String sessionId) { this.sessionId = sessionId; }
+
+    public String getUserName() { return userName; }
+    public void setUserName(String userName) { this.userName = userName; }
+
+    public String getUserEmail() { return userEmail; }
+    public void setUserEmail(String userEmail) { this.userEmail = userEmail; }
 }
+

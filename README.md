@@ -1601,4 +1601,114 @@ RAG_CHUNK_OVERLAP=80
 
 # Database
 VECTOR_DATABASE_URL=jdbc:postgresql://localhost:5432/clothing_db
+
+# Conversation Retention
+AI_CONVERSATION_RETENTION_DAYS=90
 ```
+
+---
+
+## AI Conversation Monitoring & Telemetry
+
+The platform includes an enterprise AI customer-support observability and monitoring system, allowing administrators to review, audit, and analyze every conversation between customers and the AI assistant.
+
+### Architecture
+
+```
+Customer
+   │
+   ▼
+AI Chatbot (ChatbotWidget)
+   │
+   ▼
+ProductAwareChatbotService ───► AiConversationService (Persistence & Turn Tracking)
+                                       │
+                                       ▼
+                       PostgreSQL Database
+                       ├── ai_conversations
+                       ├── ai_messages
+                       ├── ai_message_sources
+                       └── ai_message_products
+                                       │
+                                       ▼
+                 Admin AI Conversation Dashboard (/admin/ai-conversations)
+                 ├── Real-Time Multi-Turn Chat History
+                 ├── Grounded RAG Document Citations & Similarity Excerpts
+                 ├── Recommended Catalog Products
+                 ├── AI Execution Traces & Latency Telemetry
+                 ├── Unanswered Questions Loop (/admin/ai/unanswered)
+                 └── Operations & Performance Analytics (/admin/ai/analytics)
+```
+
+### Key Capabilities
+
+1. **Complete Conversation & Message Persistence**:
+   - Every user question and AI response is persisted immutably with timestamp, turn sequence number, and session identifier.
+   - Preserves full multi-turn conversational context rather than only isolated queries.
+
+2. **User & Identity Association**:
+   - Identifies which customer asked each question (name, email, user ID, or anonymous session ID).
+   - Shows active duration, turn count, and last interaction timestamp.
+
+3. **RAG Source Attribution & Chunk Tracking**:
+   - Whenever an answer is derived from knowledge base documents, the exact PDF source name, page number, similarity score (e.g. 94%), and text excerpt are stored in `ai_message_sources`.
+   - Administrators can expand and inspect the exact passages the AI relied upon.
+
+4. **Product Search & Recommendation Tracking**:
+   - Records when the AI triggers catalog searches (`PRODUCT_SEARCH`), saving recommended product IDs, names, prices, and image thumbnails into `ai_message_products`.
+
+5. **AI Processing Traces & Telemetry**:
+   - Captures processing latency in milliseconds, token usage, classified intent (`RAG_QUERY`, `PRODUCT_SEARCH`, `GREETING`), and model execution status.
+   - Collapsible inspect drawer shows technical telemetry without leaking API secrets or credentials.
+
+6. **Customer Feedback Sentiment**:
+   - Customers can rate AI responses as helpful (👍) or not helpful (👎) with optional comments, providing a customer satisfaction metric in the admin console.
+
+7. **Questions AI Could Not Answer (Continuous Knowledge Base Loop)**:
+   - Dedicated dashboard view (`/admin/ai/unanswered`) logging queries where the AI lacked sufficient documentation (e.g. international shipping to specific countries).
+   - Direct call-to-action button allows administrators to immediately upload supplementary policy PDFs to close knowledge gaps.
+
+8. **Admin Security & Role-Based Access Control (RBAC)**:
+   - All conversation monitoring APIs (`/api/admin/ai-conversations/**`) are restricted to administrators (`SUPER_ADMIN`, `ADMIN`, `SUPPORT_AGENT`).
+   - Normal customers can never access other users' chat logs.
+
+### Database Schema
+
+* `ai_conversations`:
+  - `id`: Primary key
+  - `user_id`: Reference to authenticated user (nullable for guests)
+  - `session_id`: Unique browser session identifier
+  - `title`: Dialogue title / topic summary
+  - `status`: `ACTIVE`, `CLOSED`, `ARCHIVED`
+  - `started_at`, `last_activity_at`: Timestamps
+  - `message_count`, `rag_queries_count`, `product_searches_count`: Aggregate counters
+  - `has_unanswered`: Boolean flag for knowledge gaps
+
+* `ai_messages`:
+  - `id`: Primary key
+  - `conversation_id`: Foreign key referencing `ai_conversations`
+  - `sender_type`: `USER`, `ASSISTANT`, `SYSTEM`
+  - `content`: Message text (immutable)
+  - `intent`: Classified intent (`RAG_QUERY`, `PRODUCT_SEARCH`, etc.)
+  - `model_name`: AI model configured
+  - `processing_time_ms`: Turn latency in milliseconds
+  - `is_helpful`: Customer sentiment boolean (👍/👎)
+  - `created_at`: Timestamp
+  - `sequence_number`: Chronological turn position
+
+* `ai_message_sources`:
+  - `id`: Primary key
+  - `message_id`: Foreign key referencing `ai_messages`
+  - `document_name`: Source file name (e.g. `return-policy.pdf`)
+  - `page_number`: Originating PDF page
+  - `similarity_score`: Vector match relevance (0.0 to 1.0)
+  - `source_excerpt`: Text chunk excerpt
+
+* `ai_message_products`:
+  - `id`: Primary key
+  - `message_id`: Foreign key referencing `ai_messages`
+  - `product_id`: Catalog product reference
+  - `product_name`: Name of item
+  - `price`: Unit price
+  - `relevance_score`: Search ranking score
+

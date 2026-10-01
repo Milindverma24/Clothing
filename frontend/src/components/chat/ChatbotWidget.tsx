@@ -1,15 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, X, Send, Sparkles, FileText, Loader2, RotateCcw } from 'lucide-react';
+import { MessageSquare, X, Send, Sparkles, FileText, Loader2, RotateCcw, ThumbsUp, ThumbsDown, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { sendChatMessageApi, type ChatResponseData, type CitationSourceItem, type ChatProductItem } from '../../services/ragChatApi';
+import { submitChatMessageFeedbackApi } from '../../services/aiConversationApi';
 
 interface Message {
   id: string;
+  dbMessageId?: number;
   sender: 'user' | 'assistant';
   text: string;
   sources?: CitationSourceItem[];
   products?: ChatProductItem[];
   intent?: string;
+  processingTimeMs?: number;
   timestamp: Date;
 }
 
@@ -24,6 +27,12 @@ export const ChatbotWidget: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [conversationId, setConversationId] = useState<number | null>(() => {
+    const saved = sessionStorage.getItem('clothing_chat_conv_id');
+    return saved ? Number(saved) : null;
+  });
+  const [ratedMessages, setRatedMessages] = useState<Record<number, boolean>>({});
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
@@ -47,6 +56,28 @@ export const ChatbotWidget: React.FC = () => {
     }
   }, [isOpen, messages]);
 
+  const handleResetChat = () => {
+    setConversationId(null);
+    sessionStorage.removeItem('clothing_chat_conv_id');
+    setMessages([
+      {
+        id: `welcome-${Date.now()}`,
+        sender: 'assistant',
+        text: 'Hello. I am your clothing store assistant. How can I help you today?',
+        timestamp: new Date(),
+      },
+    ]);
+  };
+
+  const handleFeedback = async (messageId: number, helpful: boolean) => {
+    try {
+      await submitChatMessageFeedbackApi(messageId, helpful);
+      setRatedMessages((prev) => ({ ...prev, [messageId]: helpful }));
+    } catch (err) {
+      console.error('Failed to submit feedback:', err);
+    }
+  };
+
   const handleSendMessage = async (textToSend?: string) => {
     const query = textToSend || inputMessage;
     if (!query.trim() || isLoading) return;
@@ -63,15 +94,25 @@ export const ChatbotWidget: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const responseData: ChatResponseData = await sendChatMessageApi(query.trim());
+      const responseData: ChatResponseData = await sendChatMessageApi(query.trim(), {
+        conversationId,
+        sessionId: sessionStorage.getItem('clothing_chat_session') || undefined,
+      });
+
+      if (responseData.conversationId) {
+        setConversationId(responseData.conversationId);
+        sessionStorage.setItem('clothing_chat_conv_id', responseData.conversationId.toString());
+      }
 
       const assistantMsg: Message = {
         id: `assistant-${Date.now()}`,
+        dbMessageId: responseData.messageId,
         sender: 'assistant',
         text: responseData.answer,
         sources: responseData.sources,
         products: responseData.products,
         intent: responseData.intent,
+        processingTimeMs: responseData.processingTimeMs,
         timestamp: new Date(),
       };
 
@@ -138,16 +179,7 @@ export const ChatbotWidget: React.FC = () => {
 
             <div className="flex items-center gap-1">
               <button
-                onClick={() =>
-                  setMessages([
-                    {
-                      id: 'welcome',
-                      sender: 'assistant',
-                      text: 'Conversation reset. How can I assist you with our catalog or store policies today?',
-                      timestamp: new Date(),
-                    },
-                  ])
-                }
+                onClick={handleResetChat}
                 className="w-8 h-8 rounded-full hover:bg-white/20 flex items-center justify-center transition-colors text-white/80 hover:text-white"
                 title="Reset Conversation"
               >
@@ -236,9 +268,40 @@ export const ChatbotWidget: React.FC = () => {
                   </div>
                 )}
 
-                <span className="text-[9px] text-[#afafaf] mt-1 px-1">
-                  {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
+                <div className="flex items-center justify-between w-full mt-1 px-1">
+                  <span className="text-[9px] text-[#afafaf]">
+                    {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+
+                  {msg.sender === 'assistant' && msg.dbMessageId && (
+                    <div className="flex items-center gap-1 text-neutral-400">
+                      {ratedMessages[msg.dbMessageId] !== undefined ? (
+                        <span className="text-[9px] text-emerald-600 font-semibold flex items-center gap-1">
+                          <Check className="w-3 h-3" /> Feedback saved
+                        </span>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleFeedback(msg.dbMessageId!, true)}
+                            className="p-1 hover:text-black hover:bg-neutral-200/60 rounded-full transition-all"
+                            title="Helpful response"
+                          >
+                            <ThumbsUp className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleFeedback(msg.dbMessageId!, false)}
+                            className="p-1 hover:text-black hover:bg-neutral-200/60 rounded-full transition-all"
+                            title="Not helpful"
+                          >
+                            <ThumbsDown className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
 

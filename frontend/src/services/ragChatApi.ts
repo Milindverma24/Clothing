@@ -23,6 +23,11 @@ export interface ChatResponseData {
   sources: CitationSourceItem[];
   products: ChatProductItem[];
   intent: 'KNOWLEDGE' | 'PRODUCT_SEARCH' | 'HYBRID';
+  conversationId?: number;
+  messageId?: number;
+  userMessageId?: number;
+  processingTimeMs?: number;
+  modelName?: string;
 }
 
 export interface KnowledgeDocumentSummary {
@@ -41,11 +46,25 @@ export interface KnowledgeDocumentSummary {
 /**
  * Send a chat question to the RAG AI Store Assistant
  */
-export async function sendChatMessageApi(message: string): Promise<ChatResponseData> {
+export async function sendChatMessageApi(
+  message: string,
+  options?: {
+    conversationId?: number | null;
+    sessionId?: string | null;
+    userName?: string;
+    userEmail?: string;
+  }
+): Promise<ChatResponseData> {
   const res = await fetch(`${API_BASE}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({
+      message,
+      conversationId: options?.conversationId,
+      sessionId: options?.sessionId,
+      userName: options?.userName,
+      userEmail: options?.userEmail,
+    }),
   });
 
   if (!res.ok) {

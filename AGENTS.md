@@ -2245,3 +2245,23 @@ When developing, maintaining, or modifying search and AI capabilities, agents mu
 16. **No Invented Attributes**: Neither the search engine nor the RAG chatbot may invent product attributes, prices, inventory availability, or discounts.
 17. **Separation of Concerns**: The Product Search engine (PostgreSQL product catalog) and the Knowledge Base RAG system (policy and guide documents) are distinct architectural subsystems. The chatbot may query the product search API to assist users with product recommendations, but the two systems must remain cleanly separated.
 
+⸻
+
+## Admin AI Conversation Monitoring & Chat History Operational Rules
+
+When developing, modifying, or extending the AI Conversation Monitoring and Telemetry subsystem, agents must strictly follow these mandatory standards:
+
+1. **Mandatory Conversation Persistence**: Every dialogue turn between customers and the AI assistant must be recorded in the PostgreSQL database (`ai_conversations`, `ai_messages`). Do NOT only store the latest question or rely on ephemeral in-memory state.
+2. **Immutable Chat History**: Once a message (USER or ASSISTANT) is persisted, it must remain immutable. Never allow administrators or automated scripts to overwrite, tamper with, or silently modify historical customer messages.
+3. **Traceable RAG Sources**: Every AI response grounded in knowledge base documents must store the originating document references in `ai_message_sources` (document name, PDF page number, cosine similarity score, and extracted text passage).
+4. **Product Search & Recommendation Tracking**: When customer intent triggers catalog discovery, record the query, candidate count, and recommended product details (ID, name, price, thumbnail) in `ai_message_products`.
+5. **AI Execution Traces & Telemetry**: Record turn latency (`processing_time_ms`), token usage, intent classification (`RAG_QUERY`, `PRODUCT_SEARCH`, `GREETING`), and error states. Administrators must be able to inspect these traces on-demand without leaking LLM API keys or provider secrets.
+6. **Continuous Knowledge Base Improvement Loop**: Unanswered inquiries (`has_unanswered = true` or `INSUFFICIENT_KNOWLEDGE_CONTEXT`) must be aggregated in `/admin/ai/unanswered` with direct workflows to upload missing documentation, trigger vector re-indexing, and close coverage gaps.
+7. **Strict Admin Authorization (RBAC)**: All endpoints under `/api/admin/ai-conversations/**` must be restricted to authenticated administrative roles (`SUPER_ADMIN`, `ADMIN`, `SUPPORT_AGENT`). Ordinary customers and guest shoppers must NEVER be able to read other users' dialogues or observability metrics.
+8. **No MongoDB / No Architecture Replacement**: The backend MUST remain Java Spring Boot + PostgreSQL. Do NOT convert the backend to Node.js/MERN, and do NOT introduce MongoDB.
+9. **UI Reference Principles**: The GitHub repository `ShakirFarhan/Realtime-Chat` is used solely as interaction inspiration (message bubbles, dual-pane layout, search, responsiveness). Adhere strictly to [design.md](file:///Users/milindverma/Desktop/Clothing/design.md) for typography, colors, pill controls, cards, and spacing.
+10. **Database-Side Search & Pagination**: Never download full conversation tables into React memory. Search by customer name, email, or message content, and paginate all conversation feeds server-side.
+11. **Configurable Retention Policy**: Conversation history retention is configurable via `AI_CONVERSATION_RETENTION_DAYS`. Do not delete records arbitrarily without an explicit operational policy.
+12. **Privacy Protection**: Do not store sensitive customer payment details, credit card numbers, passwords, or authentication secrets in message logs.
+
+

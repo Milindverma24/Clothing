@@ -21,6 +21,7 @@ import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDateTime;
 import java.util.*;
 
 @Component
@@ -31,21 +32,34 @@ public class DataLoader implements CommandLineRunner {
     private final ProductRepository productRepository;
     private final KnowledgeDocumentRepository knowledgeDocumentRepository;
     private final DocumentProcessingService documentProcessingService;
+    private final AiConversationRepository conversationRepository;
+    private final AiMessageRepository messageRepository;
+    private final AiMessageSourceRepository sourceRepository;
+    private final AiMessageProductRepository messageProductRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public DataLoader(
             ProductRepository productRepository,
             KnowledgeDocumentRepository knowledgeDocumentRepository,
-            DocumentProcessingService documentProcessingService) {
+            DocumentProcessingService documentProcessingService,
+            AiConversationRepository conversationRepository,
+            AiMessageRepository messageRepository,
+            AiMessageSourceRepository sourceRepository,
+            AiMessageProductRepository messageProductRepository) {
         this.productRepository = productRepository;
         this.knowledgeDocumentRepository = knowledgeDocumentRepository;
         this.documentProcessingService = documentProcessingService;
+        this.conversationRepository = conversationRepository;
+        this.messageRepository = messageRepository;
+        this.sourceRepository = sourceRepository;
+        this.messageProductRepository = messageProductRepository;
     }
 
     @Override
     public void run(String... args) throws Exception {
         seedProducts();
         seedStarterKnowledgeBase();
+        seedSampleConversations();
     }
 
     private void seedProducts() {
@@ -291,4 +305,208 @@ public class DataLoader implements CommandLineRunner {
             log.error("Error creating/ingesting seed PDF: " + fileName, e);
         }
     }
+
+    private void seedSampleConversations() {
+        if (conversationRepository.count() > 0) {
+            log.info("Database already contains {} AI conversations. Skipping conversation seeding.", conversationRepository.count());
+            return;
+        }
+
+        log.info("Seeding realistic sample AI conversations for Admin Monitoring...");
+
+        try {
+            // 1. Conversation: Milind Verma (Return policy question with RAG source)
+            AiConversation conv1 = new AiConversation();
+            conv1.setSessionId("sess-mv-001");
+            conv1.setUserName("Milind Verma");
+            conv1.setUserEmail("milind@example.com");
+            conv1.setTitle("Return Policy & Eligibility Inquiry");
+            conv1.setStatus("ACTIVE");
+            conv1.setStartedAt(LocalDateTime.now().minusMinutes(25));
+            conv1.setLastActivityAt(LocalDateTime.now().minusMinutes(12));
+            conv1.setMessageCount(4);
+            conv1.setRagQueriesCount(2);
+            conv1.setProductSearchesCount(0);
+            conv1.setHasUnanswered(false);
+            conv1 = conversationRepository.save(conv1);
+
+            AiMessage m1 = new AiMessage();
+            m1.setConversation(conv1);
+            m1.setSenderType("USER");
+            m1.setContent("What is your return policy?");
+            m1.setIntent("KNOWLEDGE");
+            m1.setSequenceNumber(1);
+            m1.setCreatedAt(LocalDateTime.now().minusMinutes(25));
+            messageRepository.save(m1);
+
+            AiMessage m2 = new AiMessage();
+            m2.setConversation(conv1);
+            m2.setSenderType("ASSISTANT");
+            m2.setContent("According to our Return & Refund Policy, you can return eligible products within 7 days of delivery. Items must be in their original condition, unworn, unwashed, and with all brand tags and packaging attached.");
+            m2.setIntent("KNOWLEDGE");
+            m2.setModelName("gemini-1.5-flash");
+            m2.setProcessingTimeMs(742L);
+            m2.setIsHelpful(true);
+            m2.setSequenceNumber(2);
+            m2.setCreatedAt(LocalDateTime.now().minusMinutes(24));
+            m2 = messageRepository.save(m2);
+
+            AiMessageSource s1 = new AiMessageSource("return-and-refund-policy.pdf", 1, 0.94, "Return Eligibility: Products can be returned within 7 days of delivery. Items must be in their original condition...");
+            s1.setMessage(m2);
+            sourceRepository.save(s1);
+
+            AiMessage m3 = new AiMessage();
+            m3.setConversation(conv1);
+            m3.setSenderType("USER");
+            m3.setContent("Can I return sale or clearance items?");
+            m3.setIntent("KNOWLEDGE");
+            m3.setSequenceNumber(3);
+            m3.setCreatedAt(LocalDateTime.now().minusMinutes(15));
+            messageRepository.save(m3);
+
+            AiMessage m4 = new AiMessage();
+            m4.setConversation(conv1);
+            m4.setSenderType("ASSISTANT");
+            m4.setContent("Non-Returnable Items include undergarments, personal care items, socks, and final sale items for hygiene and safety reasons.");
+            m4.setIntent("KNOWLEDGE");
+            m4.setModelName("gemini-1.5-flash");
+            m4.setProcessingTimeMs(680L);
+            m4.setIsHelpful(true);
+            m4.setSequenceNumber(4);
+            m4.setCreatedAt(LocalDateTime.now().minusMinutes(12));
+            m4 = messageRepository.save(m4);
+
+            AiMessageSource s2 = new AiMessageSource("return-and-refund-policy.pdf", 1, 0.91, "Non-Returnable Items: Undergarments, personal care products, socks, and final sale items cannot be returned...");
+            s2.setMessage(m4);
+            sourceRepository.save(s2);
+
+            // 2. Conversation: John Doe (Product search with live items)
+            AiConversation conv2 = new AiConversation();
+            conv2.setSessionId("sess-jd-002");
+            conv2.setUserName("John Doe");
+            conv2.setUserEmail("john.doe@gmail.com");
+            conv2.setTitle("Men's Black Casual Shirts Discovery");
+            conv2.setStatus("ACTIVE");
+            conv2.setStartedAt(LocalDateTime.now().minusHours(1));
+            conv2.setLastActivityAt(LocalDateTime.now().minusMinutes(42));
+            conv2.setMessageCount(2);
+            conv2.setRagQueriesCount(0);
+            conv2.setProductSearchesCount(1);
+            conv2.setHasUnanswered(false);
+            conv2 = conversationRepository.save(conv2);
+
+            AiMessage m2_1 = new AiMessage();
+            m2_1.setConversation(conv2);
+            m2_1.setSenderType("USER");
+            m2_1.setContent("Show me black shirts for men");
+            m2_1.setIntent("PRODUCT_SEARCH");
+            m2_1.setSequenceNumber(1);
+            m2_1.setCreatedAt(LocalDateTime.now().minusHours(1));
+            messageRepository.save(m2_1);
+
+            AiMessage m2_2 = new AiMessage();
+            m2_2.setConversation(conv2);
+            m2_2.setSenderType("ASSISTANT");
+            m2_2.setContent("Here are 3 black casual tops matching your search:");
+            m2_2.setIntent("PRODUCT_SEARCH");
+            m2_2.setModelName("gemini-1.5-flash");
+            m2_2.setProcessingTimeMs(415L);
+            m2_2.setIsHelpful(true);
+            m2_2.setSequenceNumber(2);
+            m2_2.setCreatedAt(LocalDateTime.now().minusMinutes(42));
+            m2_2 = messageRepository.save(m2_2);
+
+            AiMessageProduct p1 = new AiMessageProduct(300L, 11143L, "Scullers Men Price Catch Black Shirts", "scullers-men-price-catch-black-shirts-11143", 1.0, new BigDecimal("1949"), "/images/11143.jpg");
+            p1.setMessage(m2_2);
+            messageProductRepository.save(p1);
+
+            AiMessageProduct p2 = new AiMessageProduct(92L, 5865L, "ADIDAS Men's Twelve Faster T-shirt", "adidas-men-s-twelve-faster-t-shirt-5865", 0.95, new BigDecimal("2049"), "/images/5865.jpg");
+            p2.setMessage(m2_2);
+            messageProductRepository.save(p2);
+
+            // 3. Conversation: Sarah Chen (Unanswered question - knowledge gap)
+            AiConversation conv3 = new AiConversation();
+            conv3.setSessionId("sess-sc-003");
+            conv3.setUserName("Sarah Chen");
+            conv3.setUserEmail("sarah.c@techcorp.io");
+            conv3.setTitle("International Delivery Options");
+            conv3.setStatus("ACTIVE");
+            conv3.setStartedAt(LocalDateTime.now().minusHours(2));
+            conv3.setLastActivityAt(LocalDateTime.now().minusHours(2));
+            conv3.setMessageCount(2);
+            conv3.setRagQueriesCount(1);
+            conv3.setProductSearchesCount(0);
+            conv3.setHasUnanswered(true);
+            conv3 = conversationRepository.save(conv3);
+
+            AiMessage m3_1 = new AiMessage();
+            m3_1.setConversation(conv3);
+            m3_1.setSenderType("USER");
+            m3_1.setContent("Do you offer international delivery to Canada?");
+            m3_1.setIntent("KNOWLEDGE");
+            m3_1.setSequenceNumber(1);
+            m3_1.setCreatedAt(LocalDateTime.now().minusHours(2));
+            messageRepository.save(m3_1);
+
+            AiMessage m3_2 = new AiMessage();
+            m3_2.setConversation(conv3);
+            m3_2.setSenderType("ASSISTANT");
+            m3_2.setContent("I couldn't find that information in our official knowledge base. Our shipping policy currently outlines domestic deliveries across India taking 3 to 5 business days.");
+            m3_2.setIntent("KNOWLEDGE");
+            m3_2.setModelName("gemini-1.5-flash");
+            m3_2.setProcessingTimeMs(820L);
+            m3_2.setErrorStatus("INSUFFICIENT_KNOWLEDGE_CONTEXT");
+            m3_2.setIsHelpful(false);
+            m3_2.setFeedbackComment("Need shipping info for international customers");
+            m3_2.setSequenceNumber(2);
+            m3_2.setCreatedAt(LocalDateTime.now().minusHours(2));
+            messageRepository.save(m3_2);
+
+            // 4. Conversation: Alex Smith (Size Guide Inquiry)
+            AiConversation conv4 = new AiConversation();
+            conv4.setSessionId("sess-as-004");
+            conv4.setUserName("Alex Smith");
+            conv4.setUserEmail("alex.smith@lifestyle.com");
+            conv4.setTitle("Garment Sizing Guidance");
+            conv4.setStatus("CLOSED");
+            conv4.setStartedAt(LocalDateTime.now().minusDays(1));
+            conv4.setLastActivityAt(LocalDateTime.now().minusDays(1).plusMinutes(10));
+            conv4.setMessageCount(2);
+            conv4.setRagQueriesCount(1);
+            conv4.setProductSearchesCount(0);
+            conv4.setHasUnanswered(false);
+            conv4 = conversationRepository.save(conv4);
+
+            AiMessage m4_1 = new AiMessage();
+            m4_1.setConversation(conv4);
+            m4_1.setSenderType("USER");
+            m4_1.setContent("How does your sizing run for shirts?");
+            m4_1.setIntent("KNOWLEDGE");
+            m4_1.setSequenceNumber(1);
+            m4_1.setCreatedAt(LocalDateTime.now().minusDays(1));
+            messageRepository.save(m4_1);
+
+            AiMessage m4_2 = new AiMessage();
+            m4_2.setConversation(conv4);
+            m4_2.setSenderType("ASSISTANT");
+            m4_2.setContent("According to our Garment Size & Fit Guide, our tailored cuts run true to standard measurements. For an oversized relaxed drape, we recommend ordering one size up.");
+            m4_2.setIntent("KNOWLEDGE");
+            m4_2.setModelName("gemini-1.5-flash");
+            m4_2.setProcessingTimeMs(695L);
+            m4_2.setIsHelpful(true);
+            m4_2.setSequenceNumber(2);
+            m4_2.setCreatedAt(LocalDateTime.now().minusDays(1).plusMinutes(1));
+            m4_2 = messageRepository.save(m4_2);
+
+            AiMessageSource s4 = new AiMessageSource("garment-size-and-fit-guide.pdf", 1, 0.95, "Sizing Standards: Our garments are engineered around a modern athletic silhouette...");
+            s4.setMessage(m4_2);
+            sourceRepository.save(s4);
+
+            log.info("Successfully seeded 4 sample AI conversations with RAG sources, products, and feedback.");
+
+        } catch (Exception e) {
+            log.error("Error seeding sample AI conversations: ", e);
+        }
+    }
 }
+

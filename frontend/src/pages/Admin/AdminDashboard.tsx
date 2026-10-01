@@ -25,6 +25,10 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
+  MessageSquare,
+  HelpCircle,
+  Sparkles,
+  Activity,
 } from 'lucide-react';
 import { useShop } from '../../context/ShopContext';
 import { Button } from '../../components/ui/Button';
@@ -37,14 +41,35 @@ import {
   deleteKnowledgeDocumentApi,
   type KnowledgeDocumentSummary,
 } from '../../services/ragChatApi';
+import { AiConversationsView } from '../../components/admin/ai/AiConversationsView';
+import { UnansweredQuestionsView } from '../../components/admin/ai/UnansweredQuestionsView';
+import { AiAnalyticsView } from '../../components/admin/ai/AiAnalyticsView';
+import {
+  getAiConversationStatsApi,
+  type AiConversationStats,
+} from '../../services/aiConversationApi';
 
 export const AdminDashboard: React.FC = () => {
   const { products, orders } = useShop();
   const location = useLocation();
 
   const [activeTab, setActiveTab] = useState<
-    'dashboard' | 'products' | 'categories' | 'inventory' | 'orders' | 'coupons' | 'analytics' | 'audit' | 'knowledge'
+    | 'dashboard'
+    | 'products'
+    | 'categories'
+    | 'inventory'
+    | 'orders'
+    | 'coupons'
+    | 'analytics'
+    | 'audit'
+    | 'knowledge'
+    | 'ai-conversations'
+    | 'ai-unanswered'
+    | 'ai-analytics'
   >(() => {
+    if (location.pathname.includes('ai-conversations')) return 'ai-conversations';
+    if (location.pathname.includes('unanswered')) return 'ai-unanswered';
+    if (location.pathname.includes('ai-analytics') || location.pathname.includes('ai/analytics')) return 'ai-analytics';
     if (location.pathname.includes('knowledge')) return 'knowledge';
     if (location.pathname.includes('inventory')) return 'inventory';
     if (location.pathname.includes('orders')) return 'orders';
@@ -54,8 +79,29 @@ export const AdminDashboard: React.FC = () => {
     return 'products';
   });
 
+  const [aiStats, setAiStats] = useState<AiConversationStats | null>(null);
+
+  const fetchAiStats = async () => {
+    try {
+      const data = await getAiConversationStatsApi();
+      setAiStats(data);
+    } catch {
+      // quiet catch
+    }
+  };
+
   useEffect(() => {
-    if (location.pathname.includes('knowledge')) {
+    fetchAiStats();
+  }, []);
+
+  useEffect(() => {
+    if (location.pathname.includes('ai-conversations')) {
+      setActiveTab('ai-conversations');
+    } else if (location.pathname.includes('unanswered')) {
+      setActiveTab('ai-unanswered');
+    } else if (location.pathname.includes('ai-analytics') || location.pathname.includes('ai/analytics')) {
+      setActiveTab('ai-analytics');
+    } else if (location.pathname.includes('knowledge')) {
       setActiveTab('knowledge');
     }
   }, [location.pathname]);
@@ -435,51 +481,149 @@ export const AdminDashboard: React.FC = () => {
             </Link>
           </div>
 
-          <nav className="space-y-1.5">
-            {[
-              { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-              { id: 'products', label: 'Products', icon: Package, count: productData.length },
-              { id: 'categories', label: 'Categories', icon: FolderTree, count: Object.keys(categoriesSummary).length },
-              { id: 'inventory', label: 'Inventory', icon: Layers },
-              { id: 'orders', label: 'Orders', icon: ShoppingCart, count: orders.length },
-              { id: 'coupons', label: 'Coupons & Offers', icon: Tag },
-              { id: 'knowledge', label: 'Knowledge Base', icon: BookOpen, count: knowledgeDocs.length },
-              { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-              { id: 'audit', label: 'Audit Logs', icon: Users },
-            ].map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    setActiveTab(item.id as any);
-                    if (item.id === 'products') {
-                      setProductViewMode('table');
-                    }
-                  }}
-                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all ${
-                    isActive
-                      ? 'bg-black text-white'
-                      : 'text-[#5e5e5e] hover:bg-[#f4f4f4] hover:text-black'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Icon className="w-4 h-4" />
-                    <span>{item.label}</span>
-                  </div>
-                  {item.count !== undefined && (
-                    <span
-                      className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                        isActive ? 'bg-white/20 text-white' : 'bg-[#f4f4f4] text-black'
-                      }`}
-                    >
-                      {item.count}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+          <nav className="space-y-4">
+            {/* Store Management Group */}
+            <div className="space-y-1">
+              <span className="px-4 text-[10px] font-bold text-[#8a8a8a] uppercase tracking-wider block">
+                Catalog & Operations
+              </span>
+              {[
+                { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
+                { id: 'products', label: 'Products', icon: Package, count: productData.length },
+                { id: 'categories', label: 'Categories', icon: FolderTree, count: Object.keys(categoriesSummary).length },
+                { id: 'inventory', label: 'Inventory', icon: Layers },
+                { id: 'orders', label: 'Orders', icon: ShoppingCart, count: orders.length },
+                { id: 'coupons', label: 'Coupons & Offers', icon: Tag },
+              ].map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setActiveTab(item.id as any);
+                      if (item.id === 'products') {
+                        setProductViewMode('table');
+                      }
+                    }}
+                    className={`w-full flex items-center justify-between px-4 py-2.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all ${
+                      isActive
+                        ? 'bg-black text-white'
+                        : 'text-[#5e5e5e] hover:bg-[#f4f4f4] hover:text-black'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Icon className="w-4 h-4" />
+                      <span>{item.label}</span>
+                    </div>
+                    {item.count !== undefined && (
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                          isActive ? 'bg-white/20 text-white' : 'bg-[#f4f4f4] text-black'
+                        }`}
+                      >
+                        {item.count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* AI Observability & Intelligence Group */}
+            <div className="space-y-1 pt-2 border-t border-[#f4f4f4]">
+              <span className="px-4 text-[10px] font-bold text-[#8a8a8a] uppercase tracking-wider block flex items-center gap-1.5">
+                <Sparkles className="w-3 h-3 text-black" />
+                <span>AI Observability</span>
+              </span>
+              {[
+                {
+                  id: 'ai-conversations',
+                  label: 'AI Conversations',
+                  icon: MessageSquare,
+                  count: aiStats?.totalConversations,
+                },
+                {
+                  id: 'knowledge',
+                  label: 'Knowledge Base',
+                  icon: BookOpen,
+                  count: knowledgeDocs.length,
+                },
+                {
+                  id: 'ai-unanswered',
+                  label: 'Unanswered Qs',
+                  icon: HelpCircle,
+                  count: aiStats?.unansweredCount,
+                },
+                {
+                  id: 'ai-analytics',
+                  label: 'AI Analytics',
+                  icon: Activity,
+                },
+              ].map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveTab(item.id as any)}
+                    className={`w-full flex items-center justify-between px-4 py-2.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all ${
+                      isActive
+                        ? 'bg-black text-white'
+                        : 'text-[#5e5e5e] hover:bg-[#f4f4f4] hover:text-black'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Icon className="w-4 h-4" />
+                      <span>{item.label}</span>
+                    </div>
+                    {item.count !== undefined && (
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                          isActive
+                            ? 'bg-white/20 text-white'
+                            : item.id === 'ai-unanswered' && item.count > 0
+                            ? 'bg-amber-100 text-amber-900 font-black'
+                            : 'bg-[#f4f4f4] text-black'
+                        }`}
+                      >
+                        {item.count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* System Section */}
+            <div className="space-y-1 pt-2 border-t border-[#f4f4f4]">
+              <span className="px-4 text-[10px] font-bold text-[#8a8a8a] uppercase tracking-wider block">
+                System
+              </span>
+              {[
+                { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+                { id: 'audit', label: 'Audit Logs', icon: Users },
+              ].map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveTab(item.id as any)}
+                    className={`w-full flex items-center justify-between px-4 py-2.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all ${
+                      isActive
+                        ? 'bg-black text-white'
+                        : 'text-[#5e5e5e] hover:bg-[#f4f4f4] hover:text-black'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Icon className="w-4 h-4" />
+                      <span>{item.label}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </nav>
         </div>
 
@@ -1937,6 +2081,32 @@ export const AdminDashboard: React.FC = () => {
               </div>
             )}
           </div>
+        )}
+
+        {/* ========================================================
+            AI CONVERSATION MONITORING & OBSERVABILITY TABS
+           ======================================================== */}
+        {activeTab === 'ai-conversations' && (
+          <AiConversationsView
+            onNavigateToKnowledgeBase={() => setActiveTab('knowledge')}
+          />
+        )}
+
+        {activeTab === 'ai-unanswered' && (
+          <UnansweredQuestionsView
+            onNavigateToKnowledgeBase={() => setActiveTab('knowledge')}
+            onViewConversation={() => {
+              setActiveTab('ai-conversations');
+            }}
+          />
+        )}
+
+        {activeTab === 'ai-analytics' && (
+          <AiAnalyticsView
+            onNavigateToConversations={() => setActiveTab('ai-conversations')}
+            onNavigateToUnanswered={() => setActiveTab('ai-unanswered')}
+            onNavigateToKnowledgeBase={() => setActiveTab('knowledge')}
+          />
         )}
 
         {/* ========================================================
