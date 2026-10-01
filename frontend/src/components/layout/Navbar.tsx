@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Search, Heart, ShoppingBag, User, Menu, X, Shield } from 'lucide-react';
 import { useShop } from '../../context/ShopContext';
 import { getSearchSuggestionsApi } from '../../services/searchApi';
@@ -11,8 +11,56 @@ export const Navbar: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const totalCartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Auto-focus input when opened
+  useEffect(() => {
+    if (searchOpen) {
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 50);
+    }
+  }, [searchOpen]);
+
+  // Close search on route changes
+  useEffect(() => {
+    setSearchOpen(false);
+  }, [location.pathname, location.search]);
+
+  // Escape key to close, Cmd+K / Ctrl+K to toggle
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && searchOpen) {
+        setSearchOpen(false);
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [searchOpen]);
+
+  // Click outside search container to close
+  useEffect(() => {
+    if (!searchOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        searchContainerRef.current &&
+        !searchContainerRef.current.contains(e.target as Node)
+      ) {
+        setSearchOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [searchOpen]);
 
   useEffect(() => {
     if (!searchOpen || searchQuery.trim().length < 2) {
@@ -104,13 +152,19 @@ export const Navbar: React.FC = () => {
 
           {/* Right: Actions */}
           <div className="flex items-center gap-1.5 sm:gap-2">
-            {/* Search Toggle */}
+            {/* Search Toggle Button */}
             <button
               onClick={() => setSearchOpen(!searchOpen)}
-              className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-[#f4f4f4] text-black transition-colors"
-              aria-label="Search"
+              className={`w-11 h-11 flex items-center justify-center rounded-full transition-all duration-200 ${
+                searchOpen
+                  ? 'bg-black text-white shadow-xs scale-95'
+                  : 'hover:bg-[#f4f4f4] text-black hover:scale-105'
+              }`}
+              aria-label={searchOpen ? 'Close search' : 'Search products (Press ⌘K or Esc)'}
+              aria-expanded={searchOpen}
+              title={searchOpen ? 'Close search (Esc)' : 'Search products (⌘K)'}
             >
-              <Search className="w-5 h-5" />
+              {searchOpen ? <X className="w-5 h-5" /> : <Search className="w-5 h-5" />}
             </button>
 
             {/* Wishlist */}
@@ -161,32 +215,93 @@ export const Navbar: React.FC = () => {
             </Link>
           </div>
         </div>
+      </header>
 
-        {/* Search Overlay Bar */}
-        {searchOpen && (
-          <div className="absolute top-[72px] left-0 w-full bg-white border-b border-[#e5e5e5] px-4 py-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-150">
+      {/* Modern Search Overlay & Screen Backdrop */}
+      {searchOpen && (
+        <div className="fixed inset-0 top-[72px] z-50 overflow-hidden">
+          {/* Backdrop covering the entire rest of screen - clicking anywhere closes search */}
+          <div
+            className="fixed inset-0 top-[72px] bg-black/40 backdrop-blur-xs transition-opacity animate-in fade-in duration-200 cursor-pointer"
+            onClick={() => setSearchOpen(false)}
+            aria-label="Close search overlay"
+          />
+
+          {/* Search Box Container */}
+          <div
+            ref={searchContainerRef}
+            className="relative w-full bg-white border-b border-[#e5e5e5] px-4 py-5 shadow-2xl z-10 animate-in fade-in slide-in-from-top-3 duration-200"
+          >
             <div className="max-w-3xl mx-auto">
               <form onSubmit={handleSearchSubmit} className="relative flex items-center">
-                <Search className="absolute left-4 w-5 h-5 text-[#8a8a8a]" />
+                <Search className="absolute left-4 w-5 h-5 text-[#8a8a8a] pointer-events-none" />
                 <input
+                  ref={searchInputRef}
                   type="text"
                   placeholder="Search products, categories, styles (e.g. Shirts, Jeans, Navy)..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  autoFocus
-                  className="w-full pl-12 pr-24 py-3 bg-[#f4f4f4] rounded-full text-sm text-black placeholder:text-[#8a8a8a] focus:outline-none focus:ring-1 focus:ring-black"
+                  className="w-full pl-12 pr-36 py-3.5 bg-[#f4f4f4] rounded-full text-sm text-black placeholder:text-[#8a8a8a] focus:outline-none focus:ring-2 focus:ring-black transition-all"
                 />
-                <button
-                  type="submit"
-                  className="absolute right-2 px-4 py-1.5 bg-black text-white text-xs font-medium rounded-full hover:bg-[#1a1a1a]"
-                >
-                  Search
-                </button>
+
+                <div className="absolute right-2.5 flex items-center gap-1.5">
+                  {/* Clear text button */}
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-[#e5e5e5] text-[#5e5e5e] transition-colors"
+                      title="Clear search text"
+                      aria-label="Clear search"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+
+                  {/* Search submit button */}
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-black text-white text-xs font-semibold rounded-full hover:bg-[#222222] transition-colors active:scale-95"
+                  >
+                    Search
+                  </button>
+
+                  {/* Quick Close Button with ESC badge */}
+                  <button
+                    type="button"
+                    onClick={() => setSearchOpen(false)}
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-[#5e5e5e] hover:text-black hover:bg-[#f4f4f4] rounded-full transition-colors ml-0.5"
+                    title="Close search (Esc)"
+                    aria-label="Close search"
+                  >
+                    <X className="w-4 h-4" />
+                    <span className="hidden sm:inline-block text-[10px] font-mono text-[#8a8a8a] border border-[#d4d4d4] rounded px-1">ESC</span>
+                  </button>
+                </div>
               </form>
+
+              {/* Trending Quick Suggestions when empty */}
+              {!searchQuery.trim() && (
+                <div className="mt-3.5 pt-3 border-t border-[#f4f4f4] flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] font-bold text-[#8a8a8a] uppercase tracking-wider mr-1">
+                    Trending:
+                  </span>
+                  {['T-Shirts', 'Shirts', 'Formal Shoes', 'Casual', 'Black', 'Navy Blue', 'Accessories'].map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => handleSelectSuggestion(tag)}
+                      className="px-3 py-1 rounded-full bg-[#f4f4f4] hover:bg-black hover:text-white text-xs font-medium text-black transition-all"
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {/* Autocomplete Suggestions */}
               {suggestions.length > 0 && (
-                <div className="mt-2 bg-white rounded-2xl shadow-xl border border-[#e5e5e5] p-2 animate-in fade-in duration-100">
+                <div className="mt-3 bg-white rounded-2xl shadow-xl border border-[#e5e5e5] p-2 animate-in fade-in duration-100">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-[#8a8a8a] px-3 py-1 block">
                     Catalog Suggestions
                   </span>
@@ -205,8 +320,8 @@ export const Navbar: React.FC = () => {
               )}
             </div>
           </div>
-        )}
-      </header>
+        </div>
+      )}
 
       {/* Fullscreen Mobile Drawer */}
       {mobileMenuOpen && (
