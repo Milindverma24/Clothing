@@ -13,6 +13,8 @@ public interface KnowledgeDocumentChunkRepository extends JpaRepository<Knowledg
 
     List<KnowledgeDocumentChunk> findByDocumentIdOrderByChunkIndexAsc(Long documentId);
 
+    @org.springframework.transaction.annotation.Transactional
+    @org.springframework.data.jpa.repository.Modifying
     void deleteByDocumentId(Long documentId);
 
     @Query("SELECT c FROM KnowledgeDocumentChunk c WHERE c.document.status = 'INDEXED'")

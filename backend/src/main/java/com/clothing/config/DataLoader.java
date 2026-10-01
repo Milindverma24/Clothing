@@ -31,6 +31,7 @@ public class DataLoader implements CommandLineRunner {
 
     private final ProductRepository productRepository;
     private final KnowledgeDocumentRepository knowledgeDocumentRepository;
+    private final KnowledgeDocumentChunkRepository chunkRepository;
     private final DocumentProcessingService documentProcessingService;
     private final AiConversationRepository conversationRepository;
     private final AiMessageRepository messageRepository;
@@ -41,6 +42,7 @@ public class DataLoader implements CommandLineRunner {
     public DataLoader(
             ProductRepository productRepository,
             KnowledgeDocumentRepository knowledgeDocumentRepository,
+            KnowledgeDocumentChunkRepository chunkRepository,
             DocumentProcessingService documentProcessingService,
             AiConversationRepository conversationRepository,
             AiMessageRepository messageRepository,
@@ -48,6 +50,7 @@ public class DataLoader implements CommandLineRunner {
             AiMessageProductRepository messageProductRepository) {
         this.productRepository = productRepository;
         this.knowledgeDocumentRepository = knowledgeDocumentRepository;
+        this.chunkRepository = chunkRepository;
         this.documentProcessingService = documentProcessingService;
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
@@ -190,119 +193,95 @@ public class DataLoader implements CommandLineRunner {
     }
 
     private void seedStarterKnowledgeBase() {
-        if (knowledgeDocumentRepository.count() > 0) {
-            log.info("Knowledge Base already contains {} documents. Skipping seed.", knowledgeDocumentRepository.count());
-            return;
-        }
-
-        log.info("Generating starter knowledge base PDF documents (Return Policy, Size Guide, Shipping Policy)...");
-
         try {
             Path uploadDir = Paths.get("uploads", "knowledge-base");
             Files.createDirectories(uploadDir);
 
-            // 1. Return & Refund Policy PDF
-            createAndIngestPdf(
-                    uploadDir,
-                    "return-and-refund-policy.pdf",
-                    "CLOTHING BRAND - OFFICIAL RETURN & REFUND POLICY",
-                    List.of(
-                            "1. Return Eligibility: Products can be returned within 7 days of delivery. Items must be in their original condition, unworn, unwashed, and with all brand tags and original packaging attached.",
-                            "2. Non-Returnable Items: Undergarments, personal care products, socks, and final sale items cannot be returned for hygiene and safety reasons.",
-                            "3. Refund Processing: Refunds are initiated within 48 hours once the returned package is received and inspected at our fulfillment center. The amount is credited back to the original payment method within 5-7 business days.",
-                            "4. Damaged or Defective Items: If you receive a damaged or incorrect piece, contact customer support within 48 hours with order details and photos. We will arrange a free immediate replacement."
-                    )
+            // 1. Purge legacy 3 starter documents if present
+            List<KnowledgeDocument> existingDocs = knowledgeDocumentRepository.findAll();
+            for (KnowledgeDocument d : existingDocs) {
+                if (d.getOriginalFileName() != null && (
+                        d.getOriginalFileName().equals("return-and-refund-policy.pdf") ||
+                        d.getOriginalFileName().equals("shipping-and-delivery-guide.pdf") ||
+                        d.getOriginalFileName().equals("garment-size-and-fit-guide.pdf"))) {
+                    log.info("Upgrading: Removing legacy starter document '{}' (ID: {})...", d.getOriginalFileName(), d.getId());
+                    try {
+                        chunkRepository.deleteByDocumentId(d.getId());
+                        knowledgeDocumentRepository.delete(d);
+                    } catch (Exception ex) {
+                        log.warn("Could not delete legacy document {}: {}", d.getId(), ex.getMessage());
+                    }
+                }
+            }
+
+            // 2. Authoritative 17 Knowledge Base Documents
+            List<String> authoritativePdfs = List.of(
+                    "01-store-overview.pdf",
+                    "02-shopping-guide.pdf",
+                    "03-product-information.pdf",
+                    "04-size-guide.pdf",
+                    "05-shipping-delivery.pdf",
+                    "06-returns-refunds-exchanges.pdf",
+                    "07-orders.pdf",
+                    "08-payments.pdf",
+                    "09-coupons-discounts.pdf",
+                    "10-account-security.pdf",
+                    "11-product-care.pdf",
+                    "12-faq.pdf",
+                    "13-customer-support.pdf",
+                    "14-privacy-policy.pdf",
+                    "15-terms-and-conditions.pdf",
+                    "16-sustainability.pdf",
+                    "17-ai-chatbot-guide.pdf"
             );
 
-            // 2. Shipping & Delivery Policy PDF
-            createAndIngestPdf(
-                    uploadDir,
-                    "shipping-and-delivery-guide.pdf",
-                    "CLOTHING BRAND - SHIPPING & DELIVERY INFORMATION",
-                    List.of(
-                            "1. Domestic Shipping: Standard delivery takes 3 to 5 business days across all major metropolitan cities in India. Remote locations may take up to 7 business days.",
-                            "2. Shipping Fees: Standard shipping is complimentary on all orders exceeding INR 1,999. Orders below this threshold incur a flat shipping fee of INR 99.",
-                            "3. Order Tracking: As soon as your order is dispatched, an SMS and email notification with an active tracking link is provided.",
-                            "4. Cash on Delivery (COD): Available for domestic orders up to INR 10,000. COD orders undergo automated OTP verification."
-                    )
-            );
+            log.info("Checking and seeding authoritative 17 Knowledge Base PDFs...");
 
-            // 3. Garment Size & Fit Guide PDF
-            createAndIngestPdf(
-                    uploadDir,
-                    "garment-size-and-fit-guide.pdf",
-                    "CLOTHING BRAND - COMPREHENSIVE SIZE & FIT GUIDE",
-                    List.of(
-                            "1. Men's Tops: Size S (Chest 36-38 inches), Size M (Chest 38-40 inches), Size L (Chest 40-42 inches), Size XL (Chest 42-44 inches), Size XXL (Chest 44-46 inches).",
-                            "2. Men's Bottoms: Size S corresponds to waist 30, M corresponds to waist 32, L corresponds to waist 34, XL corresponds to waist 36.",
-                            "3. Women's Apparel: Size S (Bust 32-34 inches), Size M (Bust 34-36 inches), Size L (Bust 36-38 inches), Size XL (Bust 38-40 inches).",
-                            "4. Fit Profiles: 'Oversized' pieces are deliberately cut with dropped shoulders and relaxed body volume. If you prefer a tailored fit, we recommend ordering one size down."
-                    )
-            );
+            for (String pdfName : authoritativePdfs) {
+                boolean alreadyIndexed = knowledgeDocumentRepository.findAll().stream()
+                        .anyMatch(d -> pdfName.equalsIgnoreCase(d.getOriginalFileName()) && "INDEXED".equals(d.getStatus()));
 
-        } catch (Exception e) {
-            log.error("Failed to seed starter knowledge base documents", e);
-        }
-    }
+                if (alreadyIndexed) {
+                    continue;
+                }
 
-    private void createAndIngestPdf(Path uploadDir, String fileName, String title, List<String> paragraphs) {
-        try {
-            Path pdfPath = uploadDir.resolve(fileName);
-            try (PDDocument document = new PDDocument()) {
-                PDPage page = new PDPage();
-                document.addPage(page);
-
-                try (PDPageContentStream cs = new PDPageContentStream(document, page)) {
-                    cs.beginText();
-                    cs.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 14);
-                    cs.newLineAtOffset(50, 720);
-                    cs.showText(title);
-                    cs.endText();
-
-                    float y = 670;
-                    for (String p : paragraphs) {
-                        cs.beginText();
-                        cs.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 10);
-                        cs.newLineAtOffset(50, y);
-
-                        // Simple line-wrapping
-                        if (p.length() > 95) {
-                            String line1 = p.substring(0, 95);
-                            String line2 = p.substring(95);
-                            cs.showText(line1);
-                            cs.endText();
-                            y -= 14;
-                            cs.beginText();
-                            cs.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 10);
-                            cs.newLineAtOffset(50, y);
-                            cs.showText(line2);
-                        } else {
-                            cs.showText(p);
+                // Locate PDF source: check uploadDir, root knowledge-base, or parent knowledge-base
+                File sourceFile = uploadDir.resolve(pdfName).toFile();
+                if (!sourceFile.exists()) {
+                    File kbFile = Paths.get("knowledge-base", pdfName).toFile();
+                    if (kbFile.exists()) {
+                        Files.copy(kbFile.toPath(), sourceFile.toPath());
+                    } else {
+                        File parentKbFile = Paths.get("..", "knowledge-base", pdfName).toFile();
+                        if (parentKbFile.exists()) {
+                            Files.copy(parentKbFile.toPath(), sourceFile.toPath());
                         }
-                        cs.endText();
-                        y -= 28;
                     }
                 }
 
-                document.save(pdfPath.toFile());
+                if (!sourceFile.exists()) {
+                    log.warn("Could not locate knowledge base PDF: {}", pdfName);
+                    continue;
+                }
+
+                // Ingest into KnowledgeDocument and chunk repository
+                KnowledgeDocument doc = new KnowledgeDocument();
+                doc.setOriginalFileName(pdfName);
+                doc.setStoragePath(sourceFile.getAbsolutePath());
+                doc.setMimeType("application/pdf");
+                doc.setFileSize(sourceFile.length());
+                doc.setStatus("PROCESSING");
+                doc.setUploadedBy("SYSTEM_SEED");
+                doc = knowledgeDocumentRepository.save(doc);
+
+                log.info("Processing & vector indexing knowledge base document: {}", pdfName);
+                documentProcessingService.processDocumentSync(doc.getId(), sourceFile);
             }
 
-            // Ingest into RAG system
-            File file = pdfPath.toFile();
-            KnowledgeDocument doc = new KnowledgeDocument();
-            doc.setOriginalFileName(fileName);
-            doc.setStoragePath(pdfPath.toString());
-            doc.setMimeType("application/pdf");
-            doc.setFileSize(file.length());
-            doc.setStatus("PROCESSING");
-            doc.setUploadedBy("SYSTEM_SEED");
-            doc = knowledgeDocumentRepository.save(doc);
-
-            // Trigger sync ingestion for seed
-            documentProcessingService.processDocumentSync(doc.getId(), file);
+            log.info("Knowledge Base seeding complete. Total indexed documents: {}", knowledgeDocumentRepository.count());
 
         } catch (Exception e) {
-            log.error("Error creating/ingesting seed PDF: " + fileName, e);
+            log.error("Failed to seed authoritative knowledge base documents", e);
         }
     }
 
