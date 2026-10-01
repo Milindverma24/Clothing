@@ -5,6 +5,7 @@ import { useShop } from '../../context/ShopContext';
 import { ProductGrid } from '../../components/product/ProductGrid';
 import { Button } from '../../components/ui/Button';
 import { COLLECTIONS } from '../../data/collections';
+import { HeroCarousel } from '../../components/home/HeroCarousel';
 
 export const HomePage: React.FC = () => {
   const { products } = useShop();
@@ -14,45 +15,8 @@ export const HomePage: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-0 w-full">
-      {/* 1. HERO SECTION (Section 16-17 of design.md) */}
-      <section className="relative w-full min-h-[85vh] bg-[#f8f8f8] flex items-center justify-center overflow-hidden border-b border-[#e5e5e5]">
-        <div className="absolute inset-0 z-0">
-          <img
-            src="/images/hero-campaign.jpg"
-            alt="Hero Campaign"
-            className="w-full h-full object-cover object-center opacity-90 filter contrast-105"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-white via-white/30 to-transparent"></div>
-        </div>
-
-        <div className="relative z-10 max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center flex flex-col items-center">
-          <span className="text-xs uppercase tracking-[0.25em] font-bold text-black mb-4 bg-white/80 px-4 py-1.5 rounded-full border border-black/10 backdrop-blur-sm">
-            NEW SEASON 2026
-          </span>
-
-          <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold text-black tracking-tight max-w-[850px] leading-[1.08] mb-6 uppercase">
-            Built For Movement.
-          </h1>
-
-          <p className="text-base sm:text-lg text-[#5e5e5e] max-w-xl font-normal mb-8 leading-relaxed">
-            Restrained monochrome aesthetics engineered with heavyweight organic fabrics.
-            Precision silhouettes designed to hold shape everywhere.
-          </p>
-
-          <div className="flex flex-wrap items-center justify-center gap-4">
-            <Link to="/shop/men">
-              <Button variant="primary" size="lg" className="min-w-[170px]">
-                Shop Men
-              </Button>
-            </Link>
-            <Link to="/shop/women">
-              <Button variant="secondary" size="lg" className="min-w-[170px]">
-                Shop Women
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
+      {/* 1. EDITORIAL HERO SLIDESHOW */}
+      <HeroCarousel />
 
       {/* 2. VALUE PROPOSITIONS */}
       <section className="border-b border-[#e5e5e5] py-8 bg-white">
