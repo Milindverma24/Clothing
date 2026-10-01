@@ -14,6 +14,7 @@ import { AccountPage } from './pages/Account/AccountPage';
 import { SearchPage } from './pages/Search/SearchPage';
 import { AdminDashboard } from './pages/Admin/AdminDashboard';
 import { ChatbotWidget } from './components/chat/ChatbotWidget';
+import { AppSplashScreen } from './components/common/AppSplashScreen';
 import { Check } from 'lucide-react';
 
 const ToastNotification: React.FC = () => {
@@ -35,6 +36,7 @@ const AppLayout: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col justify-between bg-white text-black font-sans antialiased">
+      <AppSplashScreen />
       {!isAdmin && <Navbar />}
 
       <div className="flex-1">
