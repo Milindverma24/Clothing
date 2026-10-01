@@ -8,9 +8,12 @@ export const Footer: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-5 gap-10 pb-16 border-b border-[#2a2a2a]">
           {/* Brand Manifesto */}
           <div className="md:col-span-2">
-            <span className="font-extrabold text-2xl tracking-tight uppercase block mb-4">
-              CLOTHING
-            </span>
+            <div className="flex items-center gap-2.5 mb-4">
+              <img src="/shirt.png" alt="Company Logo" className="w-7 h-7 object-contain invert" />
+              <span className="font-extrabold text-2xl tracking-tight uppercase block">
+                CLOTHING
+              </span>
+            </div>
             <p className="text-[#afafaf] text-sm max-w-sm leading-relaxed mb-6">
               Modern clothing for everyday movement. Designed around restraint,
               monochrome discipline, and premium materials.

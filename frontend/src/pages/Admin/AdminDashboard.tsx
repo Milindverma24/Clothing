@@ -465,7 +465,7 @@ export const AdminDashboard: React.FC = () => {
         <div className="space-y-6">
           <div className="flex items-center justify-between pb-4 border-b border-[#f4f4f4]">
             <div className="flex items-center gap-2">
-              <Shield className="w-5 h-5 text-black" />
+              <img src="/shirt.png" alt="Company Logo" className="w-5 h-5 object-contain" />
               <span className="font-extrabold text-sm uppercase tracking-tight text-black">
                 Admin Portal
               </span>
