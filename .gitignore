@@ -1,0 +1,46 @@
+# Local Hugging Face dataset
+fashion-product-images/
+
+# Raw dataset
+data/raw/
+
+# Processed dataset
+data/processed/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Local environment
+.env
+.env.*
+!.env.example
+
+# Node / Frontend
+node_modules/
+dist/
+.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Java / Backend
+target/
+*.class
+*.jar
+*.war
+*.nar
+*.ear
+.mvn/wrapper/maven-wrapper.jar
+
+# IDE & OS files
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
+.vscode/
+*.sublime-project
+*.sublime-workspace

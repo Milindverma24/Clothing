@@ -1,0 +1,90 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@layer base {
+
+  :root {
+    --brand-primary: #000000;
+    --brand-primary-hover: #1a1a1a;
+    --brand-primary-pressed: #2a2a2a;
+    --brand-on-primary: #ffffff;
+
+    --brand-canvas: #ffffff;
+    --brand-canvas-soft: #f4f4f4;
+    --brand-canvas-softer: #f8f8f8;
+
+    --brand-ink: #000000;
+    --brand-body: #5e5e5e;
+    --brand-muted: #8a8a8a;
+    --brand-subtle: #afafaf;
+
+    --brand-border: #e5e5e5;
+    --brand-border-strong: #cfcfcf;
+
+    --brand-surface-dark: #000000;
+    --brand-surface-dark-soft: #171717;
+    --brand-on-dark: #ffffff;
+
+    --semantic-success: #167a45;
+    --semantic-success-soft: #e8f5ee;
+    --semantic-warning: #a15c00;
+    --semantic-warning-soft: #fff4e5;
+    --semantic-error: #b42318;
+    --semantic-error-soft: #fdecec;
+    --semantic-info: #2457a6;
+    --semantic-info-soft: #eef4ff;
+
+    --radius-pill: 999px;
+    --radius-card: 16px;
+    --radius-input: 8px;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    color: var(--brand-ink);
+    background-color: var(--brand-canvas);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #f4f4f4;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #cfcfcf;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #8a8a8a;
+  }
+}
+
+/* Design System Utilities */
+.aspect-product {
+  aspect-ratio: 4 / 5;
+}
+
+.btn-pill {
+  border-radius: 999px;
+  transition: all 180ms ease-out;
+}
+
+.btn-pill:active {
+  transform: scale(0.98);
+}
+
+.card-rounded {
+  border-radius: 16px;
+}
+
+.input-rounded {
+  border-radius: 8px;
+}
