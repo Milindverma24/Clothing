@@ -461,7 +461,7 @@ export const AdminDashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#f8f8f8] flex flex-col md:flex-row">
       {/* Admin Sidebar */}
-      <aside className="w-full md:w-64 bg-white border-r border-[#e5e5e5] p-6 flex flex-col justify-between flex-shrink-0">
+      <aside className="w-full md:w-72 bg-white border-r border-[#e5e5e5] p-5 flex flex-col justify-between flex-shrink-0">
         <div className="space-y-6">
           <div className="flex items-center justify-between pb-4 border-b border-[#f4f4f4]">
             <div className="flex items-center gap-2">
@@ -484,7 +484,7 @@ export const AdminDashboard: React.FC = () => {
           <nav className="space-y-4">
             {/* Store Management Group */}
             <div className="space-y-1">
-              <span className="px-4 text-[10px] font-bold text-[#8a8a8a] uppercase tracking-wider block">
+              <span className="px-3.5 text-[10px] font-bold text-[#8a8a8a] uppercase tracking-wider block">
                 Catalog & Operations
               </span>
               {[
@@ -506,19 +506,19 @@ export const AdminDashboard: React.FC = () => {
                         setProductViewMode('table');
                       }
                     }}
-                    className={`w-full flex items-center justify-between px-4 py-2.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all ${
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all whitespace-nowrap ${
                       isActive
-                        ? 'bg-black text-white'
+                        ? 'bg-black text-white shadow-xs'
                         : 'text-[#5e5e5e] hover:bg-[#f4f4f4] hover:text-black'
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <Icon className="w-4 h-4" />
-                      <span>{item.label}</span>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <Icon className="w-4 h-4 flex-shrink-0" />
+                      <span className="truncate">{item.label}</span>
                     </div>
                     {item.count !== undefined && (
                       <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0 ml-2 ${
                           isActive ? 'bg-white/20 text-white' : 'bg-[#f4f4f4] text-black'
                         }`}
                       >
@@ -532,7 +532,7 @@ export const AdminDashboard: React.FC = () => {
 
             {/* AI Observability & Intelligence Group */}
             <div className="space-y-1 pt-2 border-t border-[#f4f4f4]">
-              <span className="px-4 text-[10px] font-bold text-[#8a8a8a] uppercase tracking-wider block flex items-center gap-1.5">
+              <span className="px-3.5 text-[10px] font-bold text-[#8a8a8a] uppercase tracking-wider block flex items-center gap-1.5">
                 <Sparkles className="w-3 h-3 text-black" />
                 <span>AI Observability</span>
               </span>
@@ -567,19 +567,19 @@ export const AdminDashboard: React.FC = () => {
                   <button
                     key={item.id}
                     onClick={() => setActiveTab(item.id as any)}
-                    className={`w-full flex items-center justify-between px-4 py-2.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all ${
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all whitespace-nowrap ${
                       isActive
-                        ? 'bg-black text-white'
+                        ? 'bg-black text-white shadow-xs'
                         : 'text-[#5e5e5e] hover:bg-[#f4f4f4] hover:text-black'
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <Icon className="w-4 h-4" />
-                      <span>{item.label}</span>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <Icon className="w-4 h-4 flex-shrink-0" />
+                      <span className="truncate">{item.label}</span>
                     </div>
                     {item.count !== undefined && (
                       <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0 ml-2 ${
                           isActive
                             ? 'bg-white/20 text-white'
                             : item.id === 'ai-unanswered' && item.count > 0
@@ -597,7 +597,7 @@ export const AdminDashboard: React.FC = () => {
 
             {/* System Section */}
             <div className="space-y-1 pt-2 border-t border-[#f4f4f4]">
-              <span className="px-4 text-[10px] font-bold text-[#8a8a8a] uppercase tracking-wider block">
+              <span className="px-3.5 text-[10px] font-bold text-[#8a8a8a] uppercase tracking-wider block">
                 System
               </span>
               {[
@@ -610,15 +610,15 @@ export const AdminDashboard: React.FC = () => {
                   <button
                     key={item.id}
                     onClick={() => setActiveTab(item.id as any)}
-                    className={`w-full flex items-center justify-between px-4 py-2.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all ${
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all whitespace-nowrap ${
                       isActive
-                        ? 'bg-black text-white'
+                        ? 'bg-black text-white shadow-xs'
                         : 'text-[#5e5e5e] hover:bg-[#f4f4f4] hover:text-black'
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <Icon className="w-4 h-4" />
-                      <span>{item.label}</span>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <Icon className="w-4 h-4 flex-shrink-0" />
+                      <span className="truncate">{item.label}</span>
                     </div>
                   </button>
                 );
