@@ -2,11 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Search, Heart, ShoppingBag, User, Menu, X, Shield } from 'lucide-react';
 import { useShop } from '../../context/ShopContext';
+import { useAuth } from '../../context/AuthContext';
 import { getSearchSuggestionsApi } from '../../services/searchApi';
 
 export const Navbar: React.FC = () => {
-  const { cart, wishlist, setIsCartOpen } = useShop();
+  const { cart, wishlist, setIsCartOpen, showToast } = useShop();
+  const { user, isAuthenticated, logout, openAuthModal } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -15,8 +18,41 @@ export const Navbar: React.FC = () => {
 
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const accountDropdownRef = useRef<HTMLDivElement>(null);
 
   const totalCartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  const isAdminUser = Boolean(
+    isAuthenticated &&
+    user &&
+    (user.role === 'ADMIN' ||
+     user.role === 'SUPER_ADMIN' ||
+     user.role === 'PRODUCT_MANAGER' ||
+     user.role === 'ORDER_MANAGER' ||
+     user.role === 'MARKETING_MANAGER' ||
+     user.role === 'SUPPORT_AGENT')
+  );
+
+  const handleSignOut = () => {
+    setAccountDropdownOpen(false);
+    logout();
+    showToast('Signed out of account');
+    navigate('/');
+  };
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (
+        accountDropdownRef.current &&
+        !accountDropdownRef.current.contains(e.target as Node)
+      ) {
+        setAccountDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
 
   // Auto-focus input when opened
   useEffect(() => {
@@ -195,24 +231,134 @@ export const Navbar: React.FC = () => {
               )}
             </button>
 
-            {/* Account */}
-            <Link
-              to="/account"
-              className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-[#f4f4f4] text-black transition-colors"
-              aria-label="Account"
-            >
-              <User className="w-5 h-5" />
-            </Link>
+            {/* User Account / Profile Dropdown */}
+            {isAuthenticated && user ? (
+              <div className="relative" ref={accountDropdownRef}>
+                <button
+                  onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-full hover:bg-[#f4f4f4] transition-all text-black"
+                  aria-label="Account Menu"
+                  aria-expanded={accountDropdownOpen}
+                >
+                  <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center font-bold text-xs uppercase overflow-hidden">
+                    {user.avatarUrl ? (
+                      <img src={user.avatarUrl} alt={user.firstName} className="w-full h-full object-cover" />
+                    ) : (
+                      <span>{user.firstName.charAt(0)}</span>
+                    )}
+                  </div>
+                  <span className="hidden sm:inline-block text-xs font-bold text-black max-w-[90px] truncate">
+                    {user.firstName}
+                  </span>
+                </button>
 
-            {/* Admin Dashboard Entry */}
-            <Link
-              to="/admin"
-              className="hidden md:flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-[#f4f4f4] hover:bg-black hover:text-white text-black rounded-full transition-all"
-              title="Admin Management"
-            >
-              <Shield className="w-3.5 h-3.5" />
-              <span>Admin</span>
-            </Link>
+                {accountDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-64 bg-white border border-[#e5e5e5] rounded-2xl shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="px-4 py-3 border-b border-[#f4f4f4]">
+                      <p className="text-xs font-bold text-black uppercase truncate">
+                        {user.firstName} {user.lastName || ''}
+                      </p>
+                      <p className="text-[11px] text-[#5e5e5e] truncate mt-0.5">{user.email}</p>
+                      <span className="inline-block mt-1.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-[#f4f4f4] text-black uppercase tracking-wider">
+                        {user.role} Member
+                      </span>
+                    </div>
+
+                    <div className="py-1">
+                      <Link
+                        to="/account"
+                        onClick={() => setAccountDropdownOpen(false)}
+                        className="flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-black hover:bg-[#f4f4f4] transition-colors"
+                      >
+                        <User className="w-3.5 h-3.5 text-[#5e5e5e]" />
+                        <span>My Account</span>
+                      </Link>
+                      <Link
+                        to="/account?tab=orders"
+                        onClick={() => setAccountDropdownOpen(false)}
+                        className="flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-black hover:bg-[#f4f4f4] transition-colors"
+                      >
+                        <ShoppingBag className="w-3.5 h-3.5 text-[#5e5e5e]" />
+                        <span>Orders & Tracking</span>
+                      </Link>
+                      <Link
+                        to="/account?tab=wishlist"
+                        onClick={() => setAccountDropdownOpen(false)}
+                        className="flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-black hover:bg-[#f4f4f4] transition-colors"
+                      >
+                        <Heart className="w-3.5 h-3.5 text-[#5e5e5e]" />
+                        <span>Saved Wishlist</span>
+                      </Link>
+                      <Link
+                        to="/account?tab=addresses"
+                        onClick={() => setAccountDropdownOpen(false)}
+                        className="flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-black hover:bg-[#f4f4f4] transition-colors"
+                      >
+                        <User className="w-3.5 h-3.5 text-[#5e5e5e]" />
+                        <span>Addresses</span>
+                      </Link>
+                      <Link
+                        to="/account?tab=security"
+                        onClick={() => setAccountDropdownOpen(false)}
+                        className="flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-black hover:bg-[#f4f4f4] transition-colors"
+                      >
+                        <Shield className="w-3.5 h-3.5 text-[#5e5e5e]" />
+                        <span>Security & Login</span>
+                      </Link>
+
+                      {isAdminUser && (
+                        <Link
+                          to="/admin"
+                          onClick={() => setAccountDropdownOpen(false)}
+                          className="flex items-center gap-2.5 px-4 py-2 text-xs font-bold text-black bg-[#f4f4f4] hover:bg-black hover:text-white transition-colors mt-1"
+                        >
+                          <Shield className="w-3.5 h-3.5" />
+                          <span>Admin Management</span>
+                        </Link>
+                      )}
+                    </div>
+
+                    <div className="pt-1 border-t border-[#f4f4f4]">
+                      <button
+                        onClick={handleSignOut}
+                        className="w-full text-left px-4 py-2 text-xs font-semibold text-[#b91c1c] hover:bg-[#fff2f2] transition-colors flex items-center gap-2.5"
+                      >
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => openAuthModal('login')}
+                  className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-[#f4f4f4] text-black transition-colors"
+                  aria-label="Sign In"
+                  title="Sign In"
+                >
+                  <User className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => openAuthModal('login')}
+                  className="hidden sm:inline-flex items-center px-3.5 py-1.5 rounded-full bg-black text-white text-xs font-bold uppercase tracking-wider hover:bg-[#222222] transition-all"
+                >
+                  Sign In
+                </button>
+              </div>
+            )}
+
+            {/* Admin Dashboard Entry - ONLY VISIBLE WHEN ADMIN LOGS IN */}
+            {isAdminUser && (
+              <Link
+                to="/admin"
+                className="hidden md:flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-black hover:bg-[#222222] text-white rounded-full transition-all"
+                title="Admin Management"
+              >
+                <Shield className="w-3.5 h-3.5 text-white" />
+                <span>Admin</span>
+              </Link>
+            )}
           </div>
         </div>
       </header>
@@ -397,21 +543,92 @@ export const Navbar: React.FC = () => {
           </div>
 
           <div className="pt-6 border-t border-[#e5e5e5] flex flex-col gap-3">
-            <Link
-              to="/account"
-              onClick={() => setMobileMenuOpen(false)}
-              className="py-2 text-sm font-medium text-[#5e5e5e]"
-            >
-              Customer Account & Orders
-            </Link>
-            <Link
-              to="/admin"
-              onClick={() => setMobileMenuOpen(false)}
-              className="py-2 text-sm font-medium text-black flex items-center gap-2"
-            >
-              <Shield className="w-4 h-4" />
-              <span>Admin Management Dashboard</span>
-            </Link>
+            {isAuthenticated && user ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 p-3 bg-[#f8f8f8] rounded-2xl">
+                  <div className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center font-bold text-xs uppercase">
+                    {user.firstName.charAt(0)}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-black truncate">{user.firstName} {user.lastName || ''}</p>
+                    <p className="text-[11px] text-[#5e5e5e] truncate">{user.email}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <Link
+                    to="/account"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="p-2.5 bg-[#f4f4f4] rounded-xl font-semibold text-center hover:bg-black hover:text-white transition-colors"
+                  >
+                    Dashboard
+                  </Link>
+                  <Link
+                    to="/account?tab=orders"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="p-2.5 bg-[#f4f4f4] rounded-xl font-semibold text-center hover:bg-black hover:text-white transition-colors"
+                  >
+                    Orders
+                  </Link>
+                  <Link
+                    to="/account?tab=wishlist"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="p-2.5 bg-[#f4f4f4] rounded-xl font-semibold text-center hover:bg-black hover:text-white transition-colors"
+                  >
+                    Wishlist
+                  </Link>
+                  <Link
+                    to="/account?tab=addresses"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="p-2.5 bg-[#f4f4f4] rounded-xl font-semibold text-center hover:bg-black hover:text-white transition-colors"
+                  >
+                    Addresses
+                  </Link>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    handleSignOut();
+                  }}
+                  className="w-full py-2.5 bg-[#fff2f2] text-[#b91c1c] text-xs font-bold uppercase rounded-full"
+                >
+                  Sign Out
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    openAuthModal('login');
+                  }}
+                  className="py-3 bg-black text-white text-xs font-bold uppercase rounded-full text-center hover:bg-[#222222]"
+                >
+                  Sign In
+                </button>
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    openAuthModal('register');
+                  }}
+                  className="py-3 bg-[#f4f4f4] text-black text-xs font-bold uppercase rounded-full text-center hover:bg-[#e5e5e5]"
+                >
+                  Register
+                </button>
+              </div>
+            )}
+
+            {isAdminUser && (
+              <Link
+                to="/admin"
+                onClick={() => setMobileMenuOpen(false)}
+                className="py-2.5 text-xs font-bold uppercase text-black hover:underline flex items-center gap-2 pt-3 border-t border-[#f4f4f4]"
+              >
+                <Shield className="w-4 h-4 text-black" />
+                <span>Admin Management Dashboard</span>
+              </Link>
+            )}
           </div>
         </div>
       )}

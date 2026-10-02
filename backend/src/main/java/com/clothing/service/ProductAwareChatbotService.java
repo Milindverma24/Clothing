@@ -4,6 +4,7 @@ import com.clothing.dto.ChatResponseDTO;
 import com.clothing.dto.CitationSource;
 import com.clothing.dto.ProductSearchDTO;
 import com.clothing.dto.SearchResponseDTO;
+import com.clothing.repository.OrderRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -36,15 +37,19 @@ public class ProductAwareChatbotService {
             "sizes", "fit", "chart", "policy", "policies", "contact", "support", "payment"
     );
 
+    private final OrderRepository orderRepository;
+
     public ProductAwareChatbotService(
             RagService ragService,
             AiService aiService,
             ProductSearchService productSearchService,
-            AiConversationService aiConversationService) {
+            AiConversationService aiConversationService,
+            OrderRepository orderRepository) {
         this.ragService = ragService;
         this.aiService = aiService;
         this.productSearchService = productSearchService;
         this.aiConversationService = aiConversationService;
+        this.orderRepository = orderRepository;
     }
 
     public ChatResponseDTO processChat(String message) {
@@ -74,6 +79,7 @@ public class ProductAwareChatbotService {
 
         String lower = message.toLowerCase().trim();
 
+        boolean hasOrderIntent = containsAny(lower, Set.of("my order", "my orders", "where is my order", "track my order", "status of my order", "recent order", "check my order", "order details"));
         boolean hasKnowledgeIntent = containsAny(lower, KNOWLEDGE_INTENT_KEYWORDS);
         boolean hasProductIntent = containsAny(lower, PRODUCT_INTENT_KEYWORDS);
 
@@ -84,8 +90,34 @@ public class ProductAwareChatbotService {
         String modelName = "local-rag-synthesizer";
         String errorStatus = null;
 
+        // Case 0: Personal Order Status Inquiry (Securely checked against authenticated user identity)
+        if (hasOrderIntent) {
+            log.info("Handling PERSONAL_ORDER intent chat query: '{}' for user: {}", message, userEmail);
+            intent = "PERSONAL_ORDER";
+            if (userEmail != null && !userEmail.isBlank()) {
+                List<com.clothing.entity.Order> userOrders = orderRepository.findAllByCustomerEmailOrderByCreatedAtDesc(userEmail);
+                if (userOrders.isEmpty()) {
+                    answer = "Hello " + (userName != null ? userName : "") + ", you currently do not have any orders on file under " + userEmail + ". When you place an order, you can view live tracking here!";
+                } else {
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("Here is your recent order status, ").append(userName != null ? userName : "there").append(":\n\n");
+                    for (int i = 0; i < Math.min(2, userOrders.size()); i++) {
+                        com.clothing.entity.Order o = userOrders.get(i);
+                        sb.append("• **Order #").append(o.getOrderNumber()).append("**\n")
+                          .append("  Status: **").append(o.getStatus()).append("**\n")
+                          .append("  Total: ₹").append(o.getTotal()).append("\n")
+                          .append("  Carrier: ").append(o.getCarrier() != null ? o.getCarrier() : "BlueDart Express").append("\n")
+                          .append("  Tracking: `").append(o.getTrackingNumber() != null ? o.getTrackingNumber() : "Pending").append("`\n\n");
+                    }
+                    sb.append("You can view complete delivery updates and invoices in your [Account Orders](/account/orders).");
+                    answer = sb.toString();
+                }
+            } else {
+                answer = "To view your personal order details, please sign in to your CLOTHING account, or provide your Order Number or Tracking Number (e.g. 'Track ORD-10293').";
+            }
+        }
         // Case 1: Hybrid inquiry (e.g. "What is your return policy for black shirts?")
-        if (hasKnowledgeIntent && hasProductIntent) {
+        else if (hasKnowledgeIntent && hasProductIntent) {
             log.info("Handling HYBRID intent chat query: '{}'", message);
             intent = "HYBRID";
             List<RetrievedChunk> chunks = ragService.retrieveRelevantChunks(message, 3);

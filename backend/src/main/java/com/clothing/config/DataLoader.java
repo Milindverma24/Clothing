@@ -38,6 +38,10 @@ public class DataLoader implements CommandLineRunner {
     private final AiMessageSourceRepository sourceRepository;
     private final AiMessageProductRepository messageProductRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final UserRepository userRepository;
+    private final AddressRepository addressRepository;
+    private final OrderRepository orderRepository;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     public DataLoader(
             ProductRepository productRepository,
@@ -47,7 +51,11 @@ public class DataLoader implements CommandLineRunner {
             AiConversationRepository conversationRepository,
             AiMessageRepository messageRepository,
             AiMessageSourceRepository sourceRepository,
-            AiMessageProductRepository messageProductRepository) {
+            AiMessageProductRepository messageProductRepository,
+            UserRepository userRepository,
+            AddressRepository addressRepository,
+            OrderRepository orderRepository,
+            org.springframework.security.crypto.password.PasswordEncoder passwordEncoder) {
         this.productRepository = productRepository;
         this.knowledgeDocumentRepository = knowledgeDocumentRepository;
         this.chunkRepository = chunkRepository;
@@ -56,13 +64,113 @@ public class DataLoader implements CommandLineRunner {
         this.messageRepository = messageRepository;
         this.sourceRepository = sourceRepository;
         this.messageProductRepository = messageProductRepository;
+        this.userRepository = userRepository;
+        this.addressRepository = addressRepository;
+        this.orderRepository = orderRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
     public void run(String... args) throws Exception {
+        seedDefaultUsers();
         seedProducts();
         seedStarterKnowledgeBase();
         seedSampleConversations();
+    }
+
+    private void seedDefaultUsers() {
+        if (userRepository.count() > 0) {
+            log.info("Database already contains users. Skipping user seeding.");
+            return;
+        }
+
+        log.info("Seeding default admin and demo customer accounts...");
+
+        // 1. Admin user
+        User admin = new User();
+        admin.setFirstName("Super");
+        admin.setLastName("Admin");
+        admin.setEmail("admin@clothing.com");
+        admin.setPasswordHash(passwordEncoder.encode("admin123"));
+        admin.setPhone("+91 98765 43210");
+        admin.setRole("ADMIN");
+        admin.setStatus("ACTIVE");
+        admin.setEmailVerified(true);
+        admin.setCreatedAt(LocalDateTime.now().minusMonths(6));
+        admin.setUpdatedAt(LocalDateTime.now());
+        admin.setLastLoginAt(LocalDateTime.now().minusHours(2));
+        userRepository.save(admin);
+
+        // 2. Demo Customer (Milind Verma)
+        User customer = new User();
+        customer.setFirstName("Milind");
+        customer.setLastName("Verma");
+        customer.setEmail("milind@example.com");
+        customer.setPasswordHash(passwordEncoder.encode("password123"));
+        customer.setPhone("+91 98112 34567");
+        customer.setRole("CUSTOMER");
+        customer.setStatus("ACTIVE");
+        customer.setEmailVerified(true);
+        customer.setCreatedAt(LocalDateTime.now().minusMonths(2));
+        customer.setUpdatedAt(LocalDateTime.now());
+        customer.setLastLoginAt(LocalDateTime.now().minusDays(1));
+        customer = userRepository.save(customer);
+
+        // 3. Saved Address for Customer
+        Address address = new Address();
+        address.setUser(customer);
+        address.setFullName("Milind Verma");
+        address.setPhone("+91 98112 34567");
+        address.setAddressLine1("42 Architectural Boulevard, Studio 4B");
+        address.setAddressLine2("Near Metro Landmark");
+        address.setCity("Mumbai");
+        address.setState("Maharashtra");
+        address.setPostalCode("400001");
+        address.setCountry("India");
+        address.setAddressType("HOME");
+        address.setIsDefaultShipping(true);
+        address.setIsDefaultBilling(true);
+        addressRepository.save(address);
+
+        // 4. Sample Order for Customer
+        Order sampleOrder = new Order();
+        sampleOrder.setUser(customer);
+        sampleOrder.setOrderNumber("ORD-10293");
+        sampleOrder.setCustomerName("Milind Verma");
+        sampleOrder.setCustomerEmail("milind@example.com");
+        sampleOrder.setCustomerPhone("+91 98112 34567");
+        sampleOrder.setShippingAddress("42 Architectural Boulevard, Studio 4B");
+        sampleOrder.setCity("Mumbai");
+        sampleOrder.setState("Maharashtra");
+        sampleOrder.setPostalCode("400001");
+        sampleOrder.setSubtotal(new BigDecimal("2999"));
+        sampleOrder.setDiscount(new BigDecimal("300"));
+        sampleOrder.setShipping(BigDecimal.ZERO);
+        sampleOrder.setTotal(new BigDecimal("2699"));
+        sampleOrder.setStatus("SHIPPED");
+        sampleOrder.setPaymentMethod("UPI");
+        sampleOrder.setTrackingNumber("TRK-882910452");
+        sampleOrder.setCarrier("BlueDart Express");
+        sampleOrder.setEstimatedDelivery(LocalDateTime.now().plusDays(2));
+        sampleOrder.setCreatedAt(LocalDateTime.now().minusDays(3));
+
+        OrderItem item1 = new OrderItem();
+        item1.setOrder(sampleOrder);
+        item1.setProductId(15970L);
+        item1.setProductName("Heavyweight Boxy Fleece Hoodie");
+        item1.setSku("SKU-15970-L");
+        item1.setSize("L");
+        item1.setColor("Black");
+        item1.setQuantity(1);
+        item1.setUnitPrice(new BigDecimal("2999"));
+        item1.setDiscount(new BigDecimal("300"));
+        item1.setFinalPrice(new BigDecimal("2699"));
+        item1.setImageUrl("/images/hero-campaign.jpg");
+        sampleOrder.getItems().add(item1);
+
+        orderRepository.save(sampleOrder);
+
+        log.info("Default accounts seeded: admin@clothing.com / admin123, milind@example.com / password123");
     }
 
     private void seedProducts() {

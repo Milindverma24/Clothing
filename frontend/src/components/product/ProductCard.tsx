@@ -4,13 +4,15 @@ import { Heart, Plus } from 'lucide-react';
 import type { Product } from '../../types';
 import { Badge } from '../ui/Badge';
 import { useShop } from '../../context/ShopContext';
+import { useAuth } from '../../context/AuthContext';
 
 export interface ProductCardProps {
   product: Product;
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
-  const { isInWishlist, toggleWishlist, addToCart } = useShop();
+  const { isInWishlist, toggleWishlist, addToCart, showToast } = useShop();
+  const { isAuthenticated, openAuthModal } = useAuth();
   const [isHovered, setIsHovered] = useState(false);
   const isSaved = isInWishlist(product.id);
 
@@ -19,6 +21,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const handleQuickAdd = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!isAuthenticated) {
+      showToast('Please sign in to add this item to your cart');
+      openAuthModal('login', () => {
+        addToCart(product, 'M', product.baseColour || 'Black', 1);
+      });
+      return;
+    }
     addToCart(product, 'M', product.baseColour || 'Black', 1);
   };
 

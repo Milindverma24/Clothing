@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Heart, Star, Truck, RefreshCw, ShieldCheck, ChevronRight, ArrowLeft } from 'lucide-react';
 import { useShop } from '../../context/ShopContext';
+import { useAuth } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { ProductGrid } from '../../components/product/ProductGrid';
@@ -11,7 +12,8 @@ const SIZES: ('S' | 'M' | 'L' | 'XL' | 'XXL')[] = ['S', 'M', 'L', 'XL', 'XXL'];
 export const ProductDetailPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const { products, addToCart, isInWishlist, toggleWishlist } = useShop();
+  const { products, addToCart, isInWishlist, toggleWishlist, showToast } = useShop();
+  const { isAuthenticated, openAuthModal } = useAuth();
 
   const product = products.find((p) => p.slug === slug) || products[0];
   const [selectedSize, setSelectedSize] = useState<'S' | 'M' | 'L' | 'XL' | 'XXL'>('M');
@@ -44,10 +46,25 @@ export const ProductDetailPage: React.FC = () => {
   const displayImages = product.images.length > 0 ? product.images : ['/images/15970.jpg'];
 
   const handleAddToCart = () => {
+    if (!isAuthenticated) {
+      showToast('Please sign in to add this item to your cart');
+      openAuthModal('login', () => {
+        addToCart(product, selectedSize, selectedColor, 1);
+      });
+      return;
+    }
     addToCart(product, selectedSize, selectedColor, 1);
   };
 
   const handleBuyNow = () => {
+    if (!isAuthenticated) {
+      showToast('Please sign in to continue with instant checkout');
+      openAuthModal('login', () => {
+        addToCart(product, selectedSize, selectedColor, 1);
+        navigate('/checkout');
+      });
+      return;
+    }
     addToCart(product, selectedSize, selectedColor, 1);
     navigate('/checkout');
   };

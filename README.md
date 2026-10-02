@@ -1712,3 +1712,90 @@ ProductAwareChatbotService ───► AiConversationService (Persistence & Tur
   - `price`: Unit price
   - `relevance_score`: Search ranking score
 
+---
+
+## Customer Account & Profile System
+
+The platform features a full-featured customer account portal designed for minimal friction, privacy, and seamless multi-device shopping.
+
+### Core Experience & Guest-First Architecture
+
+1. **Unrestricted Guest Browsing**:
+   - Guests can freely browse the homepage, catalog, collections, category filters, and product details.
+   - Intelligent search, filters, size guides, and public store policy RAG inquiries remain open to all visitors without requiring account creation.
+   - Adding to cart is enabled for guests, storing temporary selections in local session storage (`clothing_cart`).
+
+2. **Context-Preserving Authentication**:
+   - Authentication is triggered naturally only when identity is required (e.g. Saving to Wishlist, Initiating Checkout, Accessing Account Portal, Submitting Reviews).
+   - In-place modal authentication resumes pending customer actions without reloading the page or redirecting back to the homepage.
+
+3. **Customer Account Portal (`/account`)**:
+   - **Dashboard Overview**: Personalized greeting (`Hello, {firstName} 👋`), real-time metric cards (Total Orders, Wishlist Count, Saved Addresses, Unread Alerts), recent order tracking card, and 1-click action shortcuts.
+   - **Order History & Timeline (`/account/orders`)**: Complete order history with carrier tracking numbers (`BlueDart Express`, `Delhivery`), multi-step delivery status visualizer (`PLACED` → `CONFIRMED` → `PROCESSING` → `PACKED` → `SHIPPED` → `DELIVERED`), and in-place **Return/Exchange Request** workflow with reason selection and audit notes.
+   - **Saved Wishlist (`/account/wishlist`)**: PostgreSQL-backed wishlist synchronized across devices, with instant "Move to Bag" and stock indicators.
+   - **Saved Addresses (`/account/addresses`)**: Address book supporting `HOME`, `WORK`, and `OTHER` categories, primary shipping default toggling, and full field validation. Strict backend ownership authorization prevents horizontal privilege escalation.
+   - **Profile Information (`/account/profile`)**: Update name, phone, and avatar. Email changes require verification to prevent takeover.
+   - **Security & Login (`/account/security`)**: Change password form, connected authentication providers overview (Email/Password, Google OAuth), active session termination, and real-time security activity audit log.
+   - **Verified Reviews (`/account/reviews`)**: Customers can write verified purchase ratings and reviews on delivered garments.
+   - **Notifications Center (`/account/notifications`)**: Real-time order dispatch, delivery, and return notifications with unread badges and bulk "Mark all as read".
+   - **Settings & Privacy (`/account/settings`)**: Transactional vs. promotional communication preferences, data summary download, and safe account deactivation with fiscal audit retention.
+
+---
+
+## Authentication & Security Architecture
+
+### Supported Authentication Methods
+1. **Email + Password**:
+   - Salted and hashed using BCrypt. Passwords are never logged or stored in plaintext.
+   - Secure account enumeration prevention on forgot password requests.
+2. **Google OAuth 2.0 / OpenID Connect**:
+   - Integrated via Spring Security OAuth2 Client (`spring-boot-starter-oauth2-client`).
+   - Single sign-on with verified identity claim (`email`, `given_name`, `family_name`, `picture`).
+
+### Account Linking Rules
+- **No Duplicate Accounts**: If a user registered with `milind@example.com` via email/password and later signs in with Google using `milind@example.com`, the application links the Google provider identity to the existing account rather than creating duplicate records.
+- **Provider Architecture**: The `user_auth_providers` table decouples authentication providers from the core `users` entity, supporting future identity providers (Apple, GitHub) seamlessly.
+- **Unlink Protection**: Users cannot disconnect their only authentication method if no alternative password or provider is configured.
+
+### Authentication Rules for Cart & Orders
+- **Add to Bag Authentication Guard**: Guests can explore the catalog, search, and view product details freely. When a guest attempts to add an item to the bag (via product page, quick add, or instant checkout), the `AuthModal` prompts: *"Sign in to add this item to your cart."* Upon successful authentication, the item is automatically added to the cart and the bag opens without repeating the action.
+- **Checkout & Order Creation Guard**: Unauthenticated visitors cannot access checkout or submit orders. Both frontend (`/checkout` guard) and backend (`POST /api/account/orders` with `@AuthenticationPrincipal`) strictly reject unauthenticated orders (401/403).
+- **Session Cleanup**: Logging out clears the active bag and cached customer state, ensuring that guest visitors never inherit or order from an unauthenticated session.
+- **Zero Client Price Trust**: The backend recalculates item prices, discounts, taxes, and shipping directly from PostgreSQL product and coupon records.
+
+---
+
+## Google OAuth 2.0 Setup Guide
+
+### 1. Google Cloud Console Configuration
+1. Navigate to the [Google Cloud Console](https://console.cloud.google.com/).
+2. Create or select a Google Cloud project.
+3. Configure the **OAuth Consent Screen**:
+   - User Type: **External**
+   - Application Name: `Clothing Storefront`
+   - Scopes: `openid`, `profile`, `email`
+4. Create **OAuth 2.0 Client ID**:
+   - Application Type: **Web application**
+   - Name: `Clothing Web Client`
+   - **Authorized JavaScript Origins**:
+     - Development: `http://localhost:5173`
+     - Production: `https://yourdomain.com`
+   - **Authorized Redirect URIs**:
+     - Development: `http://localhost:8080/login/oauth2/code/google`
+     - Production: `https://api.yourdomain.com/login/oauth2/code/google`
+5. Copy your **Client ID** and **Client Secret**.
+
+### 2. Environment Variables Configuration
+Never commit actual OAuth secrets to version control. Add the credentials to your local environment or `.env`:
+
+```bash
+# Backend Environment Configuration
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+GOOGLE_REDIRECT_URI=http://localhost:8080/login/oauth2/code/google
+
+# JWT Configuration
+JWT_SECRET=super-secret-jwt-signing-key-minimum-256-bits-for-production-security
+JWT_EXPIRATION_MS=604800000
+```
+

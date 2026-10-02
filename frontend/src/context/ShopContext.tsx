@@ -2,6 +2,15 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { Product, CartItem, Coupon, Order, OrderItem } from '../types';
 import { PRODUCTS } from '../data/products';
 import { COUPONS } from '../data/collections';
+import { useAuth } from './AuthContext';
+import {
+  syncWishlistApi,
+  addToWishlistApi,
+  removeFromWishlistApi,
+  getUserOrdersApi,
+  validateAndMergeCartApi,
+  getStoredToken,
+} from '../services/authApi';
 
 interface ShopContextType {
   products: Product[];
@@ -31,9 +40,12 @@ interface ShopContextType {
 const ShopContext = createContext<ShopContextType | undefined>(undefined);
 
 export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, isAuthenticated, openAuthModal } = useAuth();
   const [products] = useState<Product[]>(PRODUCTS);
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
+      const token = localStorage.getItem('clothing_token');
+      if (!token) return [];
       const saved = localStorage.getItem('clothing_cart');
       return saved ? JSON.parse(saved) : [];
     } catch {
@@ -43,6 +55,8 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [wishlist, setWishlist] = useState<(string | number)[]>(() => {
     try {
+      const token = localStorage.getItem('clothing_token');
+      if (!token) return [];
       const saved = localStorage.getItem('clothing_wishlist');
       return saved ? JSON.parse(saved) : [];
     } catch {
@@ -53,6 +67,8 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [orders, setOrders] = useState<Order[]>(() => {
     try {
+      const token = localStorage.getItem('clothing_token');
+      if (!token) return [];
       const saved = localStorage.getItem('clothing_orders');
       return saved ? JSON.parse(saved) : [];
     } catch {
@@ -63,17 +79,75 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Clear cart, wishlist, orders if user is unauthenticated
   useEffect(() => {
-    localStorage.setItem('clothing_cart', JSON.stringify(cart));
-  }, [cart]);
+    if (!isAuthenticated) {
+      setCart([]);
+      setWishlist([]);
+      setOrders([]);
+      localStorage.removeItem('clothing_cart');
+      localStorage.removeItem('clothing_wishlist');
+      localStorage.removeItem('clothing_orders');
+    }
+  }, [isAuthenticated]);
+
+  // Sync with Backend when authenticated
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+
+    // 1. Sync Wishlist
+    syncWishlistApi(wishlist)
+      .then((serverProductIds) => {
+        if (serverProductIds && serverProductIds.length > 0) {
+          setWishlist(serverProductIds);
+        }
+      })
+      .catch((err) => console.warn('Wishlist sync error:', err));
+
+    // 2. Validate & Merge Cart with backend pricing
+    if (cart.length > 0) {
+      const payload = cart.map((c) => ({
+        productId: Number(c.productId),
+        size: c.selectedSize,
+        color: c.selectedColor,
+        quantity: c.quantity,
+      }));
+      validateAndMergeCartApi(payload, appliedCoupon?.code)
+        .then((merged) => {
+          if (merged && merged.items && merged.items.length > 0) {
+            // Updated verified cart
+          }
+        })
+        .catch((err) => console.warn('Cart merge error:', err));
+    }
+
+    // 3. Sync Orders
+    getUserOrdersApi()
+      .then((serverOrders) => {
+        if (serverOrders && serverOrders.length > 0) {
+          setOrders(serverOrders);
+        }
+      })
+      .catch((err) => console.warn('Orders sync error:', err));
+  }, [isAuthenticated, user]);
 
   useEffect(() => {
-    localStorage.setItem('clothing_wishlist', JSON.stringify(wishlist));
-  }, [wishlist]);
+    if (isAuthenticated) {
+      localStorage.setItem('clothing_cart', JSON.stringify(cart));
+    }
+  }, [cart, isAuthenticated]);
 
   useEffect(() => {
-    localStorage.setItem('clothing_orders', JSON.stringify(orders));
-  }, [orders]);
+    if (isAuthenticated) {
+      localStorage.setItem('clothing_wishlist', JSON.stringify(wishlist));
+    }
+  }, [wishlist, isAuthenticated]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      localStorage.setItem('clothing_orders', JSON.stringify(orders));
+    }
+  }, [orders, isAuthenticated]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -88,6 +162,14 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     color: string = product.baseColour || 'Black',
     quantity: number = 1
   ) => {
+    if (!isAuthenticated) {
+      showToast('Please sign in to add this item to your cart');
+      openAuthModal('login', () => {
+        addToCart(product, size, color, quantity);
+      });
+      return;
+    }
+
     const variantId = `${product.id}-${size}-${color.toLowerCase().replace(/\s+/g, '-')}`;
     setCart((prev) => {
       const existing = prev.find((item) => item.id === variantId);
@@ -147,11 +229,22 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const toggleWishlist = (productId: string | number) => {
+    if (!isAuthenticated) {
+      showToast('Please sign in to save items to your wishlist');
+      openAuthModal('login', () => {
+        toggleWishlist(productId);
+      });
+      return;
+    }
+
     setWishlist((prev) => {
-      if (prev.includes(productId)) {
+      const exists = prev.includes(productId);
+      if (exists) {
+        removeFromWishlistApi(productId).catch((err) => console.warn(err));
         showToast('Removed from wishlist');
         return prev.filter((id) => id !== productId);
       } else {
+        addToWishlistApi(productId).catch((err) => console.warn(err));
         showToast('Saved to wishlist');
         return [...prev, productId];
       }
@@ -206,6 +299,12 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const createOrder = (shippingDetails: any, paymentMethod: string): Order => {
+    if (!isAuthenticated) {
+      showToast('Please sign in to place an order');
+      openAuthModal('login');
+      throw new Error('Authentication required to place an order');
+    }
+
     const orderItems: OrderItem[] = cart.map((item) => ({
       id: `oi-${Date.now()}-${item.id}`,
       productId: item.productId,
@@ -246,6 +345,45 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setOrders((prev) => [newOrder, ...prev]);
     clearCart();
+
+    // Persist to backend PostgreSQL if user authenticated
+    const token = getStoredToken();
+    if (token) {
+      fetch('http://localhost:8080/api/account/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: shippingDetails.name,
+          email: shippingDetails.email,
+          phone: shippingDetails.phone,
+          address: shippingDetails.address,
+          city: shippingDetails.city,
+          state: shippingDetails.state,
+          postalCode: shippingDetails.postalCode,
+          country: shippingDetails.country || 'India',
+          subtotal: cartSubtotal,
+          discount: cartDiscount,
+          shipping: cartShipping,
+          total: cartTotal,
+          paymentMethod,
+          items: orderItems.map((oi) => ({
+            productId: oi.productId,
+            name: oi.productName,
+            sku: oi.sku,
+            size: oi.size,
+            color: oi.color,
+            quantity: oi.quantity,
+            price: oi.unitPrice,
+            finalPrice: oi.finalPrice,
+            image: oi.image,
+          })),
+        }),
+      }).catch((err) => console.warn('Failed to sync order to server:', err));
+    }
+
     return newOrder;
   };
 

@@ -1,9 +1,11 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { ShopProvider, useShop } from './context/ShopContext';
+import { AuthProvider } from './context/AuthContext';
 import { Navbar } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
 import { CartDrawer } from './components/cart/CartDrawer';
+import { AuthModal } from './components/auth/AuthModal';
 import { HomePage } from './pages/Home/HomePage';
 import { ShopPage } from './pages/Shop/ShopPage';
 import { ProductDetailPage } from './pages/Product/ProductDetailPage';
@@ -12,6 +14,10 @@ import { WishlistPage } from './pages/Wishlist/WishlistPage';
 import { CheckoutPage } from './pages/Checkout/CheckoutPage';
 import { AccountPage } from './pages/Account/AccountPage';
 import { SearchPage } from './pages/Search/SearchPage';
+import { LoginPage } from './pages/Auth/LoginPage';
+import { RegisterPage } from './pages/Auth/RegisterPage';
+import { ForgotPasswordPage } from './pages/Auth/ForgotPasswordPage';
+import { ResetPasswordPage } from './pages/Auth/ResetPasswordPage';
 import { AdminDashboard } from './pages/Admin/AdminDashboard';
 import { ChatbotWidget } from './components/chat/ChatbotWidget';
 import { AppSplashScreen } from './components/common/AppSplashScreen';
@@ -50,8 +56,15 @@ const AppLayout: React.FC = () => {
           <Route path="/search" element={<SearchPage />} />
           <Route path="/wishlist" element={<WishlistPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />
+          
+          {/* Customer Auth & Account Routes */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/account" element={<AccountPage />} />
-          <Route path="/account/orders" element={<AccountPage />} />
+          <Route path="/account/*" element={<AccountPage />} />
+          <Route path="/profile" element={<AccountPage />} />
 
           {/* Admin Routes */}
           <Route path="/admin/*" element={<AdminDashboard />} />
@@ -59,6 +72,7 @@ const AppLayout: React.FC = () => {
       </div>
 
       <CartDrawer />
+      <AuthModal />
       <ToastNotification />
       {!isAdmin && <ChatbotWidget />}
 
@@ -69,11 +83,13 @@ const AppLayout: React.FC = () => {
 
 export const App: React.FC = () => {
   return (
-    <ShopProvider>
-      <Router>
-        <AppLayout />
-      </Router>
-    </ShopProvider>
+    <AuthProvider>
+      <ShopProvider>
+        <Router>
+          <AppLayout />
+        </Router>
+      </ShopProvider>
+    </AuthProvider>
   );
 };
 

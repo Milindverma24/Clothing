@@ -31,14 +31,18 @@ public class ChatController {
      */
     @PostMapping
     public ResponseEntity<ApiResponse<ChatResponseDTO>> chat(
-            @Valid @RequestBody ChatRequestDTO request) {
+            @Valid @RequestBody ChatRequestDTO request,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal com.clothing.security.UserPrincipal principal) {
+
+        String userEmail = principal != null ? principal.getEmail() : request.getUserEmail();
+        String userName = principal != null ? principal.getFullName() : request.getUserName();
 
         ChatResponseDTO response = chatbotService.processChat(
                 request.getMessage(),
                 request.getConversationId(),
                 request.getSessionId(),
-                request.getUserName(),
-                request.getUserEmail()
+                userName,
+                userEmail
         );
         return ResponseEntity.ok(ApiResponse.ok(response));
     }

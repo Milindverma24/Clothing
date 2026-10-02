@@ -2131,3 +2131,42 @@ All search interfaces, autocomplete components, conversational widgets, and admi
   - `PROCESSING`: Pill badge, amber tint (`bg-amber-50 text-amber-800 border-amber-200`) with spinning indicator.
   - `FAILED`: Pill badge, rose tint (`bg-rose-50 text-rose-800 border-rose-200`).
 * **Destructive Actions**: Delete triggers confirmation modal with clear explanation that vector chunks will be permanently removed.
+
+⸻
+
+## 72. Customer Account & Authentication Design Patterns
+
+The Customer Account and Authentication surfaces adhere strictly to the monochrome editorial design language.
+
+### 1. Authentication Modal (`AuthModal`)
+* **Backdrop**: `bg-black/60` with subtle backdrop blur (`backdrop-blur-xs`), smooth fade-in (`fade-in duration-200`).
+* **Modal Card**: Max width 448px (`max-w-md`), `border-radius: 24px` (`rounded-3xl`), background `#FFFFFF`, border `#E5E5E5`, soft deep shadow (`shadow-2xl`).
+* **Google OAuth CTA**: Full-width pill button (`border-radius: 999px`), background `#F8F8F8`, border `#E5E5E5`, active scale `0.99`, font size 12px, font weight bold. Includes the official colored Google "G" SVG icon.
+* **Section Divider**: Thin horizontal rule with centered uppercase tracker: `or with email` (`#8A8A8A`, font size 10px).
+* **Inputs**: Background `#F4F4F4`, `border-radius: 12px`, padding `10px 14px`, text `#000000`, placeholder `#8A8A8A`, focus ring 2px solid black.
+* **Primary Submit**: Solid black pill button (`bg-black text-white hover:bg-[#222222]`), active press scale `0.99`, uppercase font with trailing subtle arrow icon.
+
+### 2. Dedicated Auth Pages (`/login`, `/register`, `/forgot-password`, `/reset-password`)
+* **Centering Layout**: Min height `80vh`, flexbox centered on clean white canvas.
+* **Container**: Max width 448px, rounded 24px card with border `#E5E5E5`, brand logo mark header, and uppercase editorial headings.
+* **Navigation Links**: Back to storefront pill button, toggle links between Sign In and Create Account using bold black underline hover effects.
+
+### 3. Customer Navbar State & Dropdown
+* **Guest State**: High-contrast black pill CTA *"Sign In"* and user profile trigger icon.
+* **Authenticated State**: Circular user avatar button (`w-8 h-8 rounded-full bg-black text-white`) displaying user initials or uploaded avatar, adjacent to user's first name.
+* **Account Dropdown**: Floating card (`rounded-2xl`, border `#E5E5E5`, shadow-xl), containing customer name, email, membership status pill, links to `/account`, `/account?tab=orders`, `/account?tab=wishlist`, `/account?tab=addresses`, `/account?tab=security`, and high-contrast red-tinted *"Sign Out"* button.
+* **Logout Destination**: Always redirects to `/` (storefront), transitioning the user back to guest mode without breaking the shopping flow.
+
+### 4. Customer Account Portal (`/account`)
+* **Responsive Layout**:
+  - **Desktop (≥ 768px)**: 4-column grid with a left navigation sidebar (1 col) and dynamic content panel (3 cols).
+  - **Mobile (< 768px)**: Horizontal scrollable pill buttons at the top of the portal, with active state in solid black.
+* **Dashboard Metric Cards**: 4-column metric grid (`border-radius: 16px`, background `#FFFFFF`, border `#E5E5E5`), displaying count, icon, and uppercase caption. Hovering applies border color transition to `#000000`.
+* **Recent Activity Section**: Card containing latest order summary, status pill (`#e8f5ee` green background with `#167a45` text), carrier tracking code, and pill CTA *"Track & Details"*.
+
+### 5. Order Tracking Timeline
+* **Step Visualizer**: 5-step horizontal stepper (`CONFIRMED` → `PROCESSING` → `PACKED` → `SHIPPED` → `DELIVERED`). Completed steps display solid black circles with white checkmarks; pending steps use `#E5E5E5` circles.
+* **Carrier Information**: Monospace font tracking number, courier partner details, and item thumbnails with 4:5 aspect ratio.
+
+### 6. Empty States
+* **Visual Restraint**: Centered 48px minimal icon (`#8A8A8A`), bold title (e.g. *"Your wishlist is empty"*), muted secondary explanation, and primary black CTA button (e.g. *"Explore Products"* or *"Browse New Arrivals"*). Never leave blank whitespace.

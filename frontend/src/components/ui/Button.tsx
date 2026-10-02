@@ -1,4 +1,5 @@
 import React from 'react';
+import { cn } from '../../utils/cn';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'subtle' | 'danger';
@@ -35,7 +36,7 @@ export const Button: React.FC<ButtonProps> = ({
 
   return (
     <button
-      className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${widthStyle} ${className}`}
+      className={cn(baseStyles, variantStyles[variant], sizeStyles[size], widthStyle, className)}
       disabled={disabled}
       {...props}
     >
@@ -43,3 +44,4 @@ export const Button: React.FC<ButtonProps> = ({
     </button>
   );
 };
+

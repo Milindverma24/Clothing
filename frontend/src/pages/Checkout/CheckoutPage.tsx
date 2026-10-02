@@ -1,29 +1,117 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { CheckCircle2, ArrowRight, ShieldCheck, Truck, CreditCard, Lock, ArrowLeft } from 'lucide-react';
 import { useShop } from '../../context/ShopContext';
+import { useAuth } from '../../context/AuthContext';
+import { getAddressesApi } from '../../services/authApi';
+import type { Address } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 
 export const CheckoutPage: React.FC = () => {
   const navigate = useNavigate();
   const { cart, cartSubtotal, cartDiscount, cartShipping, cartTotal, appliedCoupon, createOrder, setIsCartOpen } = useShop();
+  const { user, isAuthenticated, openAuthModal } = useAuth();
 
   const [formData, setFormData] = useState({
-    name: 'Rahul Sharma',
-    email: 'rahul.sharma@example.com',
-    phone: '+91 98765 43210',
-    address: 'Flat 402, Signature Towers, Indiranagar',
-    city: 'Bengaluru',
-    state: 'Karnataka',
-    postalCode: '560038',
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    city: '',
+    state: '',
+    postalCode: '',
     country: 'India',
   });
 
+  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'upi' | 'card' | 'cod'>('upi');
   const [placedOrder, setPlacedOrder] = useState<any | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Populate authenticated customer information and addresses
+  useEffect(() => {
+    if (user) {
+      setFormData((prev) => ({
+        ...prev,
+        name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || prev.name,
+        email: user.email || prev.email,
+        phone: user.phone || prev.phone,
+      }));
+
+      getAddressesApi()
+        .then((addrList) => {
+          if (addrList && addrList.length > 0) {
+            setAddresses(addrList);
+            const def = addrList.find((a) => a.isDefaultShipping) || addrList[0];
+            setSelectedAddressId(def.id ?? null);
+            setFormData((prev) => ({
+              ...prev,
+              name: def.fullName || prev.name,
+              phone: def.phone || prev.phone,
+              address: def.addressLine1 + (def.addressLine2 ? `, ${def.addressLine2}` : ''),
+              city: def.city,
+              state: def.state,
+              postalCode: def.postalCode,
+              country: def.country || 'India',
+            }));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [user]);
+
+  const handleSelectAddress = (addr: Address) => {
+    setSelectedAddressId(addr.id ?? null);
+    setFormData((prev) => ({
+      ...prev,
+      name: addr.fullName || prev.name,
+      phone: addr.phone || prev.phone,
+      address: addr.addressLine1 + (addr.addressLine2 ? `, ${addr.addressLine2}` : ''),
+      city: addr.city,
+      state: addr.state,
+      postalCode: addr.postalCode,
+      country: addr.country || 'India',
+    }));
+  };
+
+  // 1. Guard: Authentication Required
+  if (!isAuthenticated && !placedOrder) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-24 text-center">
+        <div className="w-16 h-16 bg-[#f4f4f4] rounded-full flex items-center justify-center mx-auto mb-6 text-black">
+          <Lock className="w-8 h-8" />
+        </div>
+        <span className="text-xs uppercase font-bold tracking-widest text-[#8a8a8a] block mb-2">
+          AUTHENTICATION REQUIRED
+        </span>
+        <h1 className="text-2xl sm:text-3xl font-extrabold uppercase tracking-tight text-black mb-3">
+          Sign In to Checkout
+        </h1>
+        <p className="text-sm text-[#5e5e5e] mb-8 leading-relaxed">
+          You must be signed in to your customer account to place an order, apply member benefits, and track express delivery.
+        </p>
+        <div className="flex flex-col gap-3">
+          <Button
+            variant="primary"
+            size="lg"
+            className="w-full"
+            onClick={() => openAuthModal('login')}
+          >
+            Sign In / Register
+          </Button>
+          <Link to="/shop">
+            <Button variant="subtle" size="md" className="w-full">
+              Continue Browsing
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Guard: Empty Bag
   if (cart.length === 0 && !placedOrder) {
     return (
       <div className="max-w-[1440px] mx-auto px-4 py-24 text-center">
@@ -38,13 +126,22 @@ export const CheckoutPage: React.FC = () => {
 
   const handleSubmitOrder = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAuthenticated) {
+      openAuthModal('login');
+      return;
+    }
     setIsSubmitting(true);
 
     setTimeout(() => {
-      const order = createOrder(formData, paymentMethod.toUpperCase());
-      setPlacedOrder(order);
-      setIsSubmitting(false);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      try {
+        const order = createOrder(formData, paymentMethod.toUpperCase());
+        setPlacedOrder(order);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (err) {
+        console.error('Failed to create order:', err);
+      } finally {
+        setIsSubmitting(false);
+      }
     }, 800);
   };
 
@@ -134,6 +231,41 @@ export const CheckoutPage: React.FC = () => {
               </span>
               <span>Delivery Details</span>
             </h2>
+
+            {addresses.length > 0 && (
+              <div className="mb-6">
+                <span className="text-xs font-bold text-[#8a8a8a] uppercase tracking-wider block mb-2">
+                  Select Saved Address
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {addresses.map((addr) => (
+                    <button
+                      type="button"
+                      key={addr.id}
+                      onClick={() => handleSelectAddress(addr)}
+                      className={`p-3.5 rounded-xl border text-left transition-all ${
+                        selectedAddressId === addr.id
+                          ? 'border-black bg-[#fcfcfc] ring-1 ring-black'
+                          : 'border-[#e5e5e5] hover:border-black'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold text-black uppercase">{addr.addressType}</span>
+                        {addr.isDefaultShipping && (
+                          <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-black text-white">
+                            Default
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs font-semibold text-black truncate">{addr.fullName}</p>
+                      <p className="text-xs text-[#5e5e5e] truncate mt-0.5">
+                        {addr.addressLine1}, {addr.city}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2">

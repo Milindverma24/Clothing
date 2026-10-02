@@ -50,20 +50,20 @@
     overflow-x: hidden;
   }
 
-  /* Custom scrollbar */
+  /* Hide scrollbars across all browsers while maintaining full scrolling functionality */
+  html,
+  body {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar,
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  ::-webkit-scrollbar-track {
-    background: #f4f4f4;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: #cfcfcf;
-    border-radius: 999px;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: #8a8a8a;
+    display: none;
+    width: 0;
+    height: 0;
+    background: transparent;
   }
 }
 
@@ -88,3 +88,17 @@
 .input-rounded {
   border-radius: 8px;
 }
+
+.no-scrollbar::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.no-scrollbar,
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+

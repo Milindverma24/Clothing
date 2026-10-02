@@ -2,12 +2,43 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Heart, ShoppingBag, Trash2, ArrowLeft } from 'lucide-react';
 import { useShop } from '../../context/ShopContext';
+import { useAuth } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
 
 export const WishlistPage: React.FC = () => {
   const { wishlist, products, toggleWishlist, addToCart } = useShop();
+  const { isAuthenticated, openAuthModal } = useAuth();
 
   const savedProducts = products.filter((p) => wishlist.includes(p.id));
+
+  if (!isAuthenticated) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-24 text-center">
+        <div className="w-16 h-16 rounded-full bg-[#f4f4f4] flex items-center justify-center mx-auto mb-4 text-[#8a8a8a]">
+          <Heart className="w-7 h-7" />
+        </div>
+        <span className="text-xs uppercase font-bold tracking-widest text-[#8a8a8a] block mb-2">
+          AUTHENTICATION REQUIRED
+        </span>
+        <h2 className="text-2xl font-bold uppercase tracking-tight text-black mb-2">
+          Sign In to Access Your Wishlist
+        </h2>
+        <p className="text-sm text-[#5e5e5e] mb-8 leading-relaxed">
+          Sign in to save and manage your favorite pieces, synchronize your wishlist across devices, and receive back-in-stock alerts.
+        </p>
+        <div className="flex flex-col gap-3">
+          <Button variant="primary" size="md" onClick={() => openAuthModal('login')}>
+            Sign In / Register
+          </Button>
+          <Link to="/shop">
+            <Button variant="subtle" size="md">
+              Explore Products
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">

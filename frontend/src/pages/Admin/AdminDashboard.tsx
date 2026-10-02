@@ -31,6 +31,7 @@ import {
   Activity,
 } from 'lucide-react';
 import { useShop } from '../../context/ShopContext';
+import { useAuth } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { COUPONS } from '../../data/collections';
 import type { Product, ProductVariant, Gender } from '../../types';
@@ -51,7 +52,37 @@ import {
 
 export const AdminDashboard: React.FC = () => {
   const { products, orders } = useShop();
+  const { user, isAuthenticated, login, logout } = useAuth();
   const location = useLocation();
+
+  const [adminEmail, setAdminEmail] = useState('admin@clothing.com');
+  const [adminPassword, setAdminPassword] = useState('admin123');
+  const [adminAuthLoading, setAdminAuthLoading] = useState(false);
+  const [adminAuthError, setAdminAuthError] = useState<string | null>(null);
+
+  const isAdmin = Boolean(
+    isAuthenticated &&
+    user &&
+    (user.role === 'ADMIN' ||
+     user.role === 'SUPER_ADMIN' ||
+     user.role === 'PRODUCT_MANAGER' ||
+     user.role === 'ORDER_MANAGER' ||
+     user.role === 'MARKETING_MANAGER' ||
+     user.role === 'SUPPORT_AGENT')
+  );
+
+  const handleAdminSignIn = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setAdminAuthError(null);
+    setAdminAuthLoading(true);
+    try {
+      await login(adminEmail.trim(), adminPassword);
+    } catch (err: any) {
+      setAdminAuthError(err?.message || 'Invalid administrator credentials');
+    } finally {
+      setAdminAuthLoading(false);
+    }
+  };
 
   const [activeTab, setActiveTab] = useState<
     | 'dashboard'
@@ -457,6 +488,128 @@ export const AdminDashboard: React.FC = () => {
         return 'bg-[#f4f4f4] text-black';
     }
   };
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-[#f9f9f9] flex items-center justify-center px-4 py-12">
+        <div className="w-full max-w-md bg-white border border-[#e5e5e5] rounded-3xl p-8 sm:p-10 shadow-sm text-center">
+          <div className="w-14 h-14 bg-black text-white rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-sm">
+            <Shield className="w-7 h-7" />
+          </div>
+
+          <span className="text-[10px] font-extrabold uppercase tracking-[0.25em] text-[#8a8a8a] block mb-1">
+            MANAGEMENT ATELIER
+          </span>
+          <h1 className="text-2xl font-extrabold uppercase tracking-tight text-black mb-2">
+            Administrator Portal
+          </h1>
+
+          {isAuthenticated && user?.role === 'CUSTOMER' ? (
+            <div>
+              <div className="p-4 rounded-2xl bg-[#fff2f2] border border-[#fecaca] text-[#b91c1c] text-xs text-left mb-6 space-y-1">
+                <p className="font-bold flex items-center gap-1.5">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>Access Restricted</span>
+                </p>
+                <p className="text-[11px] leading-relaxed text-[#7f1d1d]">
+                  Signed in as <strong>{user.firstName} {user.lastName || ''}</strong> ({user.email}) with <strong>Customer</strong> role. Only staff and administrators may enter this section.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <Button
+                  variant="primary"
+                  size="md"
+                  className="w-full"
+                  onClick={() => {
+                    logout();
+                    setAdminEmail('admin@clothing.com');
+                    setAdminPassword('admin123');
+                  }}
+                >
+                  Switch to Admin Account
+                </Button>
+                <Link to="/">
+                  <Button variant="subtle" size="md" className="w-full mt-2">
+                    Return to Storefront
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <p className="text-xs text-[#5e5e5e] mb-6 leading-relaxed">
+                Sign in with administrative credentials to access the inventory atelier, order fulfillment, and AI conversation monitoring.
+              </p>
+
+              {adminAuthError && (
+                <div className="mb-4 p-3 rounded-xl bg-[#fff2f2] border border-[#fecaca] text-[#b91c1c] text-xs flex items-center gap-2 text-left">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{adminAuthError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleAdminSignIn} className="space-y-3.5 text-left mb-5">
+                <div>
+                  <label className="block text-[11px] font-bold text-black uppercase mb-1">
+                    Staff Email
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={adminEmail}
+                    onChange={(e) => setAdminEmail(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#fcfcfc] border border-[#e5e5e5] rounded-xl text-xs text-black focus:outline-none focus:border-black"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-black uppercase mb-1">
+                    Password
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#fcfcfc] border border-[#e5e5e5] rounded-xl text-xs text-black focus:outline-none focus:border-black"
+                  />
+                </div>
+
+                <Button
+                  variant="primary"
+                  size="md"
+                  disabled={adminAuthLoading}
+                  className="w-full"
+                >
+                  {adminAuthLoading ? 'Authenticating...' : 'Sign In as Administrator'}
+                </Button>
+              </form>
+
+              <div className="pt-4 border-t border-[#f4f4f4] flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdminEmail('admin@clothing.com');
+                    setAdminPassword('admin123');
+                    handleAdminSignIn();
+                  }}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full bg-[#f4f4f4] hover:bg-black hover:text-white text-[11px] font-semibold text-[#5e5e5e] transition-colors"
+                >
+                  <Shield className="w-3 h-3" />
+                  <span>One-Click Admin Sign-In (admin@clothing.com)</span>
+                </button>
+
+                <Link to="/" className="text-xs text-[#8a8a8a] hover:text-black mt-2 inline-block">
+                  ← Return to Storefront
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f8f8f8] flex flex-col md:flex-row">

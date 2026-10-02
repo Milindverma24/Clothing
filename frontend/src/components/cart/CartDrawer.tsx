@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { X, Minus, Plus, Trash2, ArrowRight, Tag, ArrowLeft } from 'lucide-react';
 import { useShop } from '../../context/ShopContext';
+import { useAuth } from '../../context/AuthContext';
 import { Button } from '../ui/Button';
 
 export const CartDrawer: React.FC = () => {
@@ -18,8 +19,10 @@ export const CartDrawer: React.FC = () => {
     appliedCoupon,
     applyCoupon,
     removeCoupon,
+    showToast,
   } = useShop();
 
+  const { isAuthenticated, openAuthModal } = useAuth();
   const [couponInput, setCouponInput] = useState('');
   const [couponError, setCouponError] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -40,6 +43,13 @@ export const CartDrawer: React.FC = () => {
 
   const handleProceedToCheckout = () => {
     setIsCartOpen(false);
+    if (!isAuthenticated) {
+      showToast('Please sign in to proceed to checkout');
+      openAuthModal('login', () => {
+        navigate('/checkout');
+      });
+      return;
+    }
     navigate('/checkout');
   };
 
@@ -82,26 +92,43 @@ export const CartDrawer: React.FC = () => {
           {/* Cart Items List */}
           <div className="flex-1 overflow-y-auto px-6 py-4 divide-y divide-[#f4f4f4]">
             {cart.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center py-16">
+              <div className="h-full flex flex-col items-center justify-center text-center py-16 px-4">
                 <div className="w-16 h-16 rounded-full bg-[#f4f4f4] flex items-center justify-center mb-4 text-[#8a8a8a]">
                   <Tag className="w-8 h-8" />
                 </div>
                 <h3 className="font-bold text-lg text-black mb-1">Your bag is empty</h3>
                 <p className="text-sm text-[#5e5e5e] max-w-xs mb-6">
-                  Explore our modern clothing collection and discover everyday essentials.
+                  {!isAuthenticated
+                    ? 'Sign in to your customer account to add pieces, save your shopping bag across devices, and checkout.'
+                    : 'Explore our modern clothing collection and discover everyday essentials.'}
                 </p>
-                <Button
-                  variant="primary"
-                  size="md"
-                  onClick={() => {
-                    setIsCartOpen(false);
-                    navigate('/shop');
-                  }}
-                  className="inline-flex items-center gap-2"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>Back to Catalog</span>
-                </Button>
+                <div className="flex flex-col gap-2.5 w-full max-w-xs">
+                  {!isAuthenticated && (
+                    <Button
+                      variant="primary"
+                      size="md"
+                      onClick={() => {
+                        setIsCartOpen(false);
+                        openAuthModal('login');
+                      }}
+                      className="w-full"
+                    >
+                      Sign In / Register
+                    </Button>
+                  )}
+                  <Button
+                    variant={!isAuthenticated ? 'secondary' : 'primary'}
+                    size="md"
+                    onClick={() => {
+                      setIsCartOpen(false);
+                      navigate('/shop');
+                    }}
+                    className="inline-flex items-center justify-center gap-2 w-full"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span>Explore Catalog</span>
+                  </Button>
+                </div>
               </div>
             ) : (
               cart.map((item) => (

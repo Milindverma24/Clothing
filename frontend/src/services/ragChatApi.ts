@@ -53,11 +53,18 @@ export async function sendChatMessageApi(
     sessionId?: string | null;
     userName?: string;
     userEmail?: string;
+    token?: string;
   }
 ): Promise<ChatResponseData> {
+  const token = options?.token || localStorage.getItem('clothing_auth_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const res = await fetch(`${API_BASE}/chat`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({
       message,
       conversationId: options?.conversationId,

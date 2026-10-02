@@ -2264,4 +2264,57 @@ When developing, modifying, or extending the AI Conversation Monitoring and Tele
 11. **Configurable Retention Policy**: Conversation history retention is configurable via `AI_CONVERSATION_RETENTION_DAYS`. Do not delete records arbitrarily without an explicit operational policy.
 12. **Privacy Protection**: Do not store sensitive customer payment details, credit card numbers, passwords, or authentication secrets in message logs.
 
+⸻
+
+## Customer Account, Profile & Google OAuth Operational Standards
+
+When developing, modifying, or extending customer accounts, profiles, authentication, or Google OAuth, agents must strictly follow these mandatory standards:
+
+1. **Guest Browsing Preservation**:
+   - Guest visitors must be able to explore the entire storefront freely (homepage, product browsing, catalog search, filters, collections, size guides, and public store policy RAG chatbot inquiries).
+   - NEVER force registration or login merely to browse or view catalog items.
+
+2. **Context-Preserving Authentication & Action Resumption**:
+   - Authentication is strictly required for: Adding to Bag/Cart, Checkout, Placing Orders, Adding to Wishlist, Accessing Personal Orders, Saving Delivery Addresses, Submitting Product Reviews, and Profile Settings.
+   - When a guest clicks "Add to Bag", "Quick Add", "Buy It Now", or "Proceed to Checkout", the system immediately opens the `AuthModal` ("Sign in to add this item to your cart").
+   - Upon successful sign in or registration, the action is automatically completed (item added to bag / cart opened / redirected to checkout) without forcing the customer to repeat their action.
+
+3. **Backend Authorization & Zero Client Trust**:
+   - Never trust client-provided `userId` from request parameters, request body, or localStorage.
+   - Always derive the authenticated customer identity from the verified Spring Security `SecurityContext` / JWT token (`@AuthenticationPrincipal UserPrincipal`).
+   - Order placement (`POST /api/account/orders`) strictly requires valid authentication. Unauthenticated requests are rejected with 401/403.
+   - Customer orders, saved addresses, wishlists, and notifications must enforce strict ownership verification. Return 403/404 if a user attempts to access another customer's resource.
+
+4. **Dual Authentication & Google OAuth 2.0**:
+   - Email/password authentication and Google OAuth 2.0 co-exist as first-class authentication methods.
+   - Google OAuth is an additional login option, never a replacement for local credentials.
+   - Use Spring Security OAuth2 Client (`spring-boot-starter-oauth2-client`). Never handle OAuth secrets in React.
+   - `GOOGLE_CLIENT_SECRET` must remain strictly server-side. Never expose it in Vite `.env`, JavaScript bundles, public folders, or Git.
+
+5. **No Duplicate Accounts & Provider Linking**:
+   - If an account exists with a verified email (e.g. `milind@example.com` created via password) and the user logs in via Google with that same email, LINK the Google provider to the existing account.
+   - Do NOT create duplicate accounts for the same verified email address.
+   - Decouple identity providers in `user_auth_providers` (`provider`, `provider_user_id`, `provider_email`) to support future OAuth additions.
+
+6. **Admin Role Protection**:
+   - Users authenticating via Google OAuth receive the `CUSTOMER` role by default.
+   - Google login must NEVER automatically grant `ADMIN`, `SUPER_ADMIN`, or management roles. Application roles are strictly governed by the database RBAC tables.
+
+7. **Cart & Wishlist State Management**:
+   - When a user logs out, the active cart and sensitive states are cleared so an unauthenticated visitor cannot hold or place an order with a previous session's cart.
+   - Guest wishlists are synchronized to PostgreSQL via `/api/account/wishlist/sync` upon authentication.
+   - The backend recalculates unit prices, discounts, taxes, and shipping directly from PostgreSQL. Never trust client-calculated totals.
+
+8. **RAG Chatbot Grounding for Authenticated Customers**:
+   - The RAG Chatbot must support authenticated identity headers (`Authorization: Bearer <token>`).
+   - When an authenticated customer asks "Where is my order?" or "Show my recent orders", the system must look up only their own orders and ground the response securely without leaking another customer's data.
+
+9. **Safe Logout**:
+   - Logout must clear the JWT token, reset authenticated client state, and redirect to `/` (storefront).
+   - Do NOT redirect to `/login` on logout. The customer must seamlessly continue browsing as a guest.
+
+10. **Password Security**:
+    - Passwords must be salted and hashed with BCrypt. Plaintext passwords must NEVER be saved, logged, or exposed in API responses.
+    - Password recovery (`/api/auth/forgot-password`) must use generic responses ("If an account exists for this email, a reset link has been sent") to prevent account enumeration.
+
 

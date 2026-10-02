@@ -16,6 +16,7 @@ import {
 import { Link } from 'react-router-dom';
 import { sendChatMessageApi, type ChatResponseData, type CitationSourceItem, type ChatProductItem } from '../../services/ragChatApi';
 import { submitChatMessageFeedbackApi, getCustomerChatHistoryApi } from '../../services/aiConversationApi';
+import { useAuth } from '../../context/AuthContext';
 
 interface Message {
   id: string;
@@ -30,14 +31,22 @@ interface Message {
   timestamp: Date;
 }
 
-const STARTER_PROMPTS = [
+const GUEST_STARTER_PROMPTS = [
   'What is your return policy?',
   'How long does shipping take?',
   'What is the size guide for men?',
   'Do you have navy blue shirts?',
 ];
 
+const AUTH_STARTER_PROMPTS = [
+  'Where is my order?',
+  'Show my recent orders',
+  'Can I return my order?',
+  'What is your return window?',
+];
+
 export const ChatbotWidget: React.FC = () => {
+  const { user, isAuthenticated } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -46,6 +55,8 @@ export const ChatbotWidget: React.FC = () => {
     return saved ? Number(saved) : null;
   });
   const [ratedMessages, setRatedMessages] = useState<Record<number, boolean>>({});
+
+  const starterPrompts = isAuthenticated ? AUTH_STARTER_PROMPTS : GUEST_STARTER_PROMPTS;
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -147,6 +158,8 @@ export const ChatbotWidget: React.FC = () => {
       const responseData: ChatResponseData = await sendChatMessageApi(query.trim(), {
         conversationId,
         sessionId: sessionStorage.getItem('clothing_chat_session') || undefined,
+        userName: user ? `${user.firstName} ${user.lastName || ''}`.trim() : undefined,
+        userEmail: user?.email,
       });
 
       if (responseData.conversationId) {
@@ -410,7 +423,7 @@ export const ChatbotWidget: React.FC = () => {
           {/* Quick Starter Chips */}
           {messages.length <= 2 && (
             <div className="px-4 py-2 bg-white border-t border-[#f4f4f4] flex items-center gap-1.5 overflow-x-auto scrollbar-none flex-shrink-0">
-              {STARTER_PROMPTS.map((prompt) => (
+              {starterPrompts.map((prompt) => (
                 <button
                   key={prompt}
                   onClick={() => handleSendMessage(prompt)}

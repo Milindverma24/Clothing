@@ -1,5 +1,6 @@
 package com.clothing.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -7,7 +8,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "orders")
+@Table(name = "orders", indexes = {
+    @Index(name = "idx_orders_customer_email", columnList = "customer_email"),
+    @Index(name = "idx_orders_order_number", columnList = "order_number", unique = true)
+})
 public class Order {
 
     @Id
@@ -16,6 +20,11 @@ public class Order {
 
     @Column(name = "order_number", nullable = false, unique = true)
     private String orderNumber;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    @JsonIgnore
+    private User user;
 
     @Column(name = "customer_name", nullable = false)
     private String customerName;
@@ -32,8 +41,14 @@ public class Order {
     @Column(name = "city")
     private String city;
 
+    @Column(name = "state")
+    private String state;
+
     @Column(name = "postal_code")
     private String postalCode;
+
+    @Column(name = "country")
+    private String country = "India";
 
     private BigDecimal subtotal;
     private BigDecimal discount;
@@ -43,13 +58,28 @@ public class Order {
     @Column(name = "coupon_code")
     private String couponCode;
 
-    private String status = "PENDING";
+    private String status = "CONFIRMED"; // PENDING, CONFIRMED, PROCESSING, PACKED, SHIPPED, OUT_FOR_DELIVERY, DELIVERED, CANCELLED
 
     @Column(name = "payment_method")
     private String paymentMethod;
 
     @Column(name = "tracking_number")
     private String trackingNumber;
+
+    @Column(name = "carrier")
+    private String carrier = "BlueDart Express";
+
+    @Column(name = "estimated_delivery")
+    private LocalDateTime estimatedDelivery;
+
+    @Column(name = "return_status")
+    private String returnStatus = "NONE"; // NONE, REQUESTED, APPROVED, RETURNED, REFUNDED
+
+    @Column(name = "return_reason")
+    private String returnReason;
+
+    @Column(name = "return_comment", columnDefinition = "TEXT")
+    private String returnComment;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -64,6 +94,9 @@ public class Order {
 
     public String getOrderNumber() { return orderNumber; }
     public void setOrderNumber(String orderNumber) { this.orderNumber = orderNumber; }
+
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
 
     public String getCustomerName() { return customerName; }
     public void setCustomerName(String customerName) { this.customerName = customerName; }
@@ -80,8 +113,14 @@ public class Order {
     public String getCity() { return city; }
     public void setCity(String city) { this.city = city; }
 
+    public String getState() { return state; }
+    public void setState(String state) { this.state = state; }
+
     public String getPostalCode() { return postalCode; }
     public void setPostalCode(String postalCode) { this.postalCode = postalCode; }
+
+    public String getCountry() { return country; }
+    public void setCountry(String country) { this.country = country; }
 
     public BigDecimal getSubtotal() { return subtotal; }
     public void setSubtotal(BigDecimal subtotal) { this.subtotal = subtotal; }
@@ -106,6 +145,21 @@ public class Order {
 
     public String getTrackingNumber() { return trackingNumber; }
     public void setTrackingNumber(String trackingNumber) { this.trackingNumber = trackingNumber; }
+
+    public String getCarrier() { return carrier; }
+    public void setCarrier(String carrier) { this.carrier = carrier; }
+
+    public LocalDateTime getEstimatedDelivery() { return estimatedDelivery; }
+    public void setEstimatedDelivery(LocalDateTime estimatedDelivery) { this.estimatedDelivery = estimatedDelivery; }
+
+    public String getReturnStatus() { return returnStatus; }
+    public void setReturnStatus(String returnStatus) { this.returnStatus = returnStatus; }
+
+    public String getReturnReason() { return returnReason; }
+    public void setReturnReason(String returnReason) { this.returnReason = returnReason; }
+
+    public String getReturnComment() { return returnComment; }
+    public void setReturnComment(String returnComment) { this.returnComment = returnComment; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

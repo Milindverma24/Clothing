@@ -142,3 +142,74 @@ export interface FilterState {
   sort?: 'recommended' | 'newest' | 'price_asc' | 'price_desc' | 'best_selling' | 'rating';
   searchQuery?: string;
 }
+
+export interface User {
+  id: number;
+  email: string;
+  firstName: string;
+  lastName?: string;
+  displayName?: string;
+  phone?: string;
+  avatarUrl?: string;
+  emailVerified: boolean;
+  role: string;
+  status: string;
+  createdAt?: string;
+  hasPassword?: boolean;
+  connectedProviders?: string[];
+}
+
+export interface Address {
+  id?: number;
+  fullName: string;
+  phone: string;
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+  addressType: 'HOME' | 'WORK' | 'OTHER';
+  isDefaultShipping: boolean;
+  isDefaultBilling: boolean;
+}
+
+export interface UserNotification {
+  id: number;
+  title: string;
+  message: string;
+  type: string;
+  isRead: boolean;
+  link?: string;
+  createdAt: string;
+}
+
+export interface CustomerReview {
+  id: number;
+  productId: number;
+  productName: string;
+  productImage?: string;
+  rating: number;
+  title: string;
+  comment: string;
+  verifiedPurchase: boolean;
+  status: 'PENDING' | 'APPROVED' | 'HIDDEN' | 'FLAGGED';
+  createdAt: string;
+}
+
+export interface SecurityAuditLog {
+  id: number;
+  userId?: number;
+  action: string;
+  ipAddress?: string;
+  details?: string;
+  createdAt: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  tokenType: string;
+  expiresIn: number;
+  user: User;
+}
+
