@@ -64,7 +64,7 @@ DEFAULT_POLICY_DOCS = [
         "keywords": ["human", "support", "agent", "executive", "representative", "contact", "email", "phone", "help"],
         "content": (
             "Our customer concierge team is available Monday to Saturday, 9:00 AM to 8:00 PM IST. "
-            "You can contact us via email at support@clothing.com or call +91 98112 34567. "
+            "You can contact us via email at support@nova.com or call +91 98112 34567. "
             "You can also ask to 'talk to a human' directly in this chat widget for instant escalation."
         )
     },
@@ -74,7 +74,7 @@ DEFAULT_POLICY_DOCS = [
         "page_number": 1,
         "keywords": ["brand", "store", "about", "what do you sell", "catalog", "clothing", "collection", "apparel"],
         "content": (
-            "CLOTHING is a modern apparel brand crafting minimalist, functional movement wear for everyday life. "
+            "Nova is a modern apparel brand crafting minimalist, functional movement wear for everyday life. "
             "Our catalog features premium 100% combed cotton t-shirts, classic oxford and casual shirts, 380 GSM heavyweight boxy hoodies, "
             "relaxed trousers, and everyday comfort footwear for men and unisex wear."
         )

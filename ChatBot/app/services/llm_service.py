@@ -209,7 +209,7 @@ class LLMService:
         # Regular natural conversational response for offline/mock mode
         if any(w in last_user_msg for w in ["hi", "hello", "hey", "namaste", "morning", "evening"]):
             return (
-                "Hello! Welcome to CLOTHING. I am your 24/7 personal shopping assistant.\n\n"
+                "Hello! Welcome to Nova. I am your 24/7 personal shopping assistant.\n\n"
                 "I can help you discover items in our collection, track recent orders, answer questions about "
                 "sizing and fabric care, or explain our store policies. How can I help you today?"
             )
@@ -269,7 +269,7 @@ class LLMService:
         # Context-aware general answer
         return (
             f"Regarding your query about '{last_user_msg}': "
-            "At CLOTHING, we focus on timeless everyday movement wear and effortless shopping. "
+            "At Nova, we focus on timeless everyday movement wear and effortless shopping. "
             "You can ask me to search specific colors and styles, check your order status, or explore our store policies!"
         )
 

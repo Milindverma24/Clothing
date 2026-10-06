@@ -100,7 +100,7 @@ export const CartDrawer: React.FC = () => {
                 <p className="text-sm text-[#5e5e5e] max-w-xs mb-6">
                   {!isAuthenticated
                     ? 'Sign in to your customer account to add pieces, save your shopping bag across devices, and checkout.'
-                    : 'Explore our modern clothing collection and discover everyday essentials.'}
+                    : 'Explore our modern Nova collection and discover everyday essentials.'}
                 </p>
                 <div className="flex flex-col gap-2.5 w-full max-w-xs">
                   {!isAuthenticated && (

@@ -113,7 +113,7 @@ public class ProductAwareChatbotService {
                     answer = sb.toString();
                 }
             } else {
-                answer = "To view your personal order details, please sign in to your CLOTHING account, or provide your Order Number or Tracking Number (e.g. 'Track ORD-10293').";
+                answer = "To view your personal order details, please sign in to your Nova account, or provide your Order Number or Tracking Number (e.g. 'Track ORD-10293').";
             }
         }
         // Case 1: Hybrid inquiry (e.g. "What is your return policy for black shirts?")

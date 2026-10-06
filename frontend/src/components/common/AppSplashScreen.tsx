@@ -38,7 +38,7 @@ export const AppSplashScreen: React.FC<AppSplashScreenProps> = ({ onFinish }) =>
       } else if (eased < 90) {
         setPhaseText('SYNCHRONIZING INTELLIGENT SEARCH...');
       } else {
-        setPhaseText('WELCOME TO CLOTHING');
+        setPhaseText('WELCOME TO NOVA');
       }
 
       if (rawProgress < 1) {
@@ -83,23 +83,28 @@ export const AppSplashScreen: React.FC<AppSplashScreenProps> = ({ onFinish }) =>
       {/* Main Center Content */}
       <div className="relative z-10 flex flex-col items-center text-center px-4 max-w-sm w-full">
         {/* App Logo with soft generative aura */}
-        <div className="relative mb-7">
+        <div className="relative mb-6">
           {/* Ethereal pulsing halo glow */}
           <div className="absolute inset-0 -m-3 rounded-3xl bg-black/5 blur-xl animate-pulse" />
           
           <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-[#f8f8f8] border border-black/5 flex items-center justify-center shadow-lg transition-transform duration-500 hover:scale-105">
             <img
               src="/shirt.png"
-              alt="Clothing Brand Logo"
+              alt="Nova Logo"
               className="w-12 h-12 sm:w-14 sm:h-14 object-contain filter drop-shadow-xs"
             />
           </div>
         </div>
 
-        {/* Brand App Name */}
-        <h1 className="text-xl sm:text-2xl font-black tracking-[0.35em] text-black uppercase mb-1 ml-1">
-          C L O T H I N G
-        </h1>
+        {/* Brand App Name in Calligraphy */}
+        <div className="mb-2">
+          <img
+            src="/nova-calligraphy.png"
+            srcSet="/nova-calligraphy.png 1x, /nova-calligraphy@2x.png 2x"
+            alt="Nova"
+            className="h-12 sm:h-14 w-auto object-contain mx-auto"
+          />
+        </div>
         <span className="text-[10px] uppercase tracking-[0.3em] font-semibold text-[#8a8a8a] mb-8">
           STUDIO // EDITION 2026
         </span>

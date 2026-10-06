@@ -44,3 +44,7 @@ Thumbs.db
 .vscode/
 *.sublime-project
 *.sublime-workspace
+
+# Runtime scripts & logs
+.run/
+logs/

@@ -551,7 +551,7 @@ class CommerceAgent:
 
             elif intent == IntentType.GREETING:
                 final_message = (
-                    "Hello! Welcome to CLOTHING. I am your 24/7 personal shopping assistant.\n\n"
+                    "Hello! Welcome to Nova. I am your 24/7 personal shopping assistant.\n\n"
                     "I can help you with:\n"
                     "• Discovering items in our collection (e.g., 'Black shirts under ₹1500')\n"
                     "• Live order tracking & delivery status (e.g., 'Where is my order?')\n"
@@ -582,7 +582,7 @@ class CommerceAgent:
 
             elif intent == IntentType.STORE_INFO and not products:
                 final_message = (
-                    "**About CLOTHING**\n\n"
+                    "**About Nova**\n\n"
                     "We design minimal, functional everyday movement wear crafted from premium sustainable fabrics. "
                     "Our lineup includes 100% combed cotton t-shirts, tailored oxford shirts, 380 GSM fleece hoodies, and comfort footwear.\n\n"
                     "Would you like me to show you our popular shirts or new arrivals?"
@@ -593,7 +593,7 @@ class CommerceAgent:
                 llm_reply = await llm_service.generate(
                     messages=[{"role": "user", "content": request.message}],
                     system_prompt=(
-                        "You are the intelligent digital personal shopper and customer concierge for CLOTHING, "
+                        "You are the intelligent digital personal shopper and customer concierge for Nova, "
                         "a premium modern clothing brand. Answer clearly, accurately, and warmly in 1-2 concise paragraphs. "
                         "Connect your answer back to how the customer can shop, track orders, or manage their wardrobe."
                     )

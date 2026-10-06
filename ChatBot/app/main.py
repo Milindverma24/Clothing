@@ -23,8 +23,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="AI Commerce Agent API",
-    description="Intelligent 24/7 digital personal shopper and customer concierge for clothing e-commerce.",
+    title="Nova AI Commerce Agent API",
+    description="Intelligent 24/7 digital personal shopper and customer concierge for Nova.",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
@@ -81,10 +81,10 @@ app.include_router(admin_router)
 @app.get("/", tags=["Root"])
 async def root():
     return {
-        "service": "AI Commerce Agent Microservice",
+        "service": "Nova AI Commerce Agent Microservice",
         "status": "RUNNING",
         "version": "1.0.0",
         "docs_url": "http://localhost:8001/docs",
         "health_url": "http://localhost:8001/health",
-        "description": "24/7 digital personal shopper and customer concierge for clothing e-commerce."
+        "description": "24/7 digital personal shopper and customer concierge for Nova."
     }

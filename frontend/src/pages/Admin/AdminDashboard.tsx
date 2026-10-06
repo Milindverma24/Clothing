@@ -808,9 +808,15 @@ export const AdminDashboard: React.FC = () => {
         <div className="space-y-6">
           <div className="flex items-center justify-between pb-4 border-b border-[#f4f4f4]">
             <div className="flex items-center gap-2">
-              <img src="/shirt.png" alt="Company Logo" className="w-5 h-5 object-contain" />
-              <span className="font-extrabold text-sm uppercase tracking-tight text-black">
-                Admin Portal
+              <img src="/shirt.png" alt="Nova Logo" className="w-5 h-5 object-contain" />
+              <img
+                src="/nova-calligraphy.png"
+                srcSet="/nova-calligraphy.png 1x, /nova-calligraphy@2x.png 2x"
+                alt="Nova"
+                className="h-5 w-auto object-contain"
+              />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#8a8a8a] ml-0.5">
+                Admin
               </span>
             </div>
             <Link

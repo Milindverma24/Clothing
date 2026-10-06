@@ -147,10 +147,13 @@ export const AuthModal: React.FC = () => {
         {/* Modal Header */}
         <div className="text-center mb-6">
           <div className="inline-flex items-center justify-center gap-2.5 mb-3">
-            <img src="/shirt.png" alt="CLOTHING Logo" className="w-8 h-8 object-contain" />
-            <span className="font-extrabold text-xl tracking-tight text-black uppercase">
-              CLOTHING
-            </span>
+            <img src="/shirt.png" alt="Nova Logo" className="w-8 h-8 object-contain" />
+            <img
+              src="/nova-calligraphy.png"
+              srcSet="/nova-calligraphy.png 1x, /nova-calligraphy@2x.png 2x"
+              alt="Nova"
+              className="h-8 w-auto object-contain"
+            />
           </div>
           <h2 className="text-2xl font-extrabold uppercase tracking-tight text-black">
             {authModalView === 'login' && 'Sign In'}

@@ -1,5 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Allura&family=Great+Vibes&family=Inter:wght@400;500;600;700;800&family=Parisienne&display=swap');
 @import "tailwindcss";
+
+.font-calligraphy {
+  font-family: 'Great Vibes', 'Alex Brush', 'Allura', 'Parisienne', cursive, serif;
+}
 
 @layer base {
 

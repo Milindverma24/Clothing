@@ -9,10 +9,13 @@ export const Footer: React.FC = () => {
           {/* Brand Manifesto */}
           <div className="md:col-span-2">
             <div className="flex items-center gap-2.5 mb-4">
-              <img src="/shirt.png" alt="Company Logo" className="w-7 h-7 object-contain invert" />
-              <span className="font-extrabold text-2xl tracking-tight uppercase block">
-                CLOTHING
-              </span>
+              <img src="/shirt.png" alt="Nova Logo" className="w-7 h-7 object-contain invert" />
+              <img
+                src="/nova-calligraphy-white.png"
+                srcSet="/nova-calligraphy-white.png 1x, /nova-calligraphy-white@2x.png 2x"
+                alt="Nova"
+                className="h-8 w-auto object-contain"
+              />
             </div>
             <p className="text-[#afafaf] text-sm max-w-sm leading-relaxed mb-6">
               Modern clothing for everyday movement. Designed around restraint,
@@ -126,7 +129,7 @@ export const Footer: React.FC = () => {
 
         {/* Bottom bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#8a8a8a]">
-          <p>© 2026 CLOTHING BRAND. All rights reserved.</p>
+          <p>© 2026 NOVA. All rights reserved.</p>
           <div className="flex gap-6">
             <a href="#privacy" className="hover:text-white transition-colors">
               Privacy Policy

@@ -112,7 +112,7 @@ export const AIChatWidget: React.FC = () => {
   const welcomeMessage = useMemo<ChatMessage>(() => ({
     id: 'welcome',
     sender: 'agent',
-    text: "Hello 👋\n\nFind something you'll love, check your size, manage your orders, or ask me anything.",
+    text: "Hello 👋 Welcome to Nova.\n\nFind something you'll love, check your size, manage your orders, or ask me anything.",
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }), []);
 
@@ -951,12 +951,12 @@ export const AIChatWidget: React.FC = () => {
         <button
           onClick={() => setIsOpen(true)}
           className="bg-black text-white w-14 h-14 rounded-full shadow-2xl flex items-center justify-center hover:bg-neutral-800 transition-all transform hover:scale-105 cursor-pointer border border-neutral-800 relative group"
-          aria-label="AI Shopping Assistant"
-          title="AI Shopping Assistant"
+          aria-label="Nova AI Assistant"
+          title="Nova AI Assistant"
         >
           <span className="text-xl">💬</span>
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 absolute top-3.5 right-3.5 ring-2 ring-black animate-pulse"></span>
-          <span className="sr-only">AI Shopping Assistant</span>
+          <span className="sr-only">Nova AI Assistant</span>
         </button>
       )}
 
@@ -968,9 +968,14 @@ export const AIChatWidget: React.FC = () => {
           <div className="bg-black text-white px-4 py-3.5 flex justify-between items-center border-b border-neutral-800">
             <div className="flex items-center gap-2.5">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              <div>
-                <h3 className="font-semibold text-sm leading-tight tracking-tight">AI Shopping Assistant</h3>
-                <p className="text-[11px] text-neutral-400 leading-tight">Online</p>
+              <div className="flex items-center gap-2">
+                <img
+                  src="/nova-calligraphy-white.png"
+                  srcSet="/nova-calligraphy-white.png 1x, /nova-calligraphy-white@2x.png 2x"
+                  alt="Nova"
+                  className="h-5 w-auto object-contain"
+                />
+                <span className="text-xs text-neutral-300 font-medium tracking-tight">AI Concierge</span>
               </div>
             </div>
             <div className="flex items-center gap-1.5">

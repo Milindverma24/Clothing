@@ -239,7 +239,7 @@ async def order_product(
                 success=False,
                 tool_name="order_product",
                 status="FAILED",
-                message="To complete your order, please sign in to your CLOTHING account."
+                message="To complete your order, please sign in to your Nova account."
             )
         return ToolResult(
             success=False,

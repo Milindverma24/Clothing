@@ -78,8 +78,8 @@ public class AuthService {
         // Welcome notification
         notificationRepository.save(new UserNotification(
             user,
-            "Welcome to CLOTHING",
-            "Welcome to the CLOTHING syndicate. Enjoy complimentary delivery on orders over ₹1,499.",
+            "Welcome to Nova",
+            "Welcome to Nova. Enjoy complimentary delivery on orders over ₹1,499.",
             "ACCOUNT",
             "/account"
         ));
@@ -158,8 +158,8 @@ public class AuthService {
 
             notificationRepository.save(new UserNotification(
                 user,
-                "Welcome to CLOTHING",
-                "Your account was created via Google Sign-In. Welcome to the CLOTHING syndicate.",
+                "Welcome to Nova",
+                "Your account was created via Google Sign-In. Welcome to Nova.",
                 "ACCOUNT",
                 "/account"
             ));

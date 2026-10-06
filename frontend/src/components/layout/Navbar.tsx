@@ -144,11 +144,14 @@ export const Navbar: React.FC = () => {
               <Menu className="w-5 h-5 text-black" />
             </button>
 
-            <Link to="/" className="flex items-center gap-2.5 group">
-              <img src="/shirt.png" alt="Company Logo" className="w-7 h-7 object-contain transition-transform group-hover:scale-105" />
-              <span className="font-extrabold text-xl tracking-tight text-black uppercase">
-                CLOTHING
-              </span>
+            <Link to="/" className="flex items-center gap-2.5 group" aria-label="Nova Home">
+              <img src="/shirt.png" alt="Nova Logo" className="w-7 h-7 object-contain transition-transform group-hover:scale-105" />
+              <img
+                src="/nova-calligraphy.png"
+                srcSet="/nova-calligraphy.png 1x, /nova-calligraphy@2x.png 2x"
+                alt="Nova"
+                className="h-7 w-auto object-contain transition-opacity group-hover:opacity-85"
+              />
             </Link>
           </div>
 
@@ -474,12 +477,15 @@ export const Navbar: React.FC = () => {
         <div className="fixed inset-0 z-50 bg-white flex flex-col justify-between p-6 overflow-y-auto">
           <div>
             <div className="flex items-center justify-between mb-8 pb-4 border-b border-[#e5e5e5]">
-              <div className="flex items-center gap-2.5">
-                <img src="/shirt.png" alt="Company Logo" className="w-7 h-7 object-contain" />
-                <span className="font-extrabold text-xl tracking-tight text-black uppercase">
-                  CLOTHING
-                </span>
-              </div>
+              <Link to="/" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2.5" aria-label="Nova Home">
+                <img src="/shirt.png" alt="Nova Logo" className="w-7 h-7 object-contain" />
+                <img
+                  src="/nova-calligraphy.png"
+                  srcSet="/nova-calligraphy.png 1x, /nova-calligraphy@2x.png 2x"
+                  alt="Nova"
+                  className="h-7 w-auto object-contain"
+                />
+              </Link>
               <button
                 onClick={() => setMobileMenuOpen(false)}
                 className="w-11 h-11 flex items-center justify-center rounded-full bg-[#f4f4f4]"

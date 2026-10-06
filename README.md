@@ -1040,6 +1040,28 @@ Install:
 
 ---
 
+### Single Command Quickstart (Recommended)
+
+Start the entire platform (Spring Boot API, AI ChatBot microservice, and React storefront) in one command:
+
+```bash
+./start.sh
+```
+
+Or run as background daemons:
+
+```bash
+./start.sh --daemon    # or -d
+```
+
+Management commands:
+* **Check status:** `./start.sh status`
+* **Stop all services:** `./start.sh stop` or `./stop.sh`
+* **Restart all services:** `./start.sh restart`
+* **Tail logs:** `./start.sh logs [backend|chatbot|frontend]`
+
+---
+
 ### Step 1: Clone Repository
 
 ```bash

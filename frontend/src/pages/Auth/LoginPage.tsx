@@ -82,11 +82,14 @@ export const LoginPage: React.FC = () => {
       <div className="w-full max-w-md bg-white border border-[#e5e5e5] rounded-3xl p-8 sm:p-10 shadow-sm">
         {/* Header */}
         <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center gap-2 mb-4 group">
-            <img src="/shirt.png" alt="Logo" className="w-8 h-8 object-contain" />
-            <span className="font-extrabold text-xl tracking-tight text-black uppercase">
-              CLOTHING
-            </span>
+          <Link to="/" className="inline-flex items-center gap-2 mb-4 group" aria-label="Nova Home">
+            <img src="/shirt.png" alt="Nova Logo" className="w-8 h-8 object-contain" />
+            <img
+              src="/nova-calligraphy.png"
+              srcSet="/nova-calligraphy.png 1x, /nova-calligraphy@2x.png 2x"
+              alt="Nova"
+              className="h-8 w-auto object-contain"
+            />
           </Link>
           <h1 className="text-2xl sm:text-3xl font-extrabold uppercase tracking-tight text-black">
             {redirectPath.startsWith('/admin') ? 'Admin Sign In' : 'Welcome Back'}

@@ -14,8 +14,8 @@
     <groupId>com.clothing</groupId>
     <artifactId>clothing-backend</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>Clothing E-Commerce Backend</name>
-    <description>Production Spring Boot REST API for Premium Clothing Brand</description>
+    <name>Nova E-Commerce Backend</name>
+    <description>Production Spring Boot REST API for Nova Fashion Brand</description>
 
     <properties>
         <java.version>17</java.version>
