@@ -34,7 +34,17 @@ import { useShop } from '../../context/ShopContext';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { COUPONS } from '../../data/collections';
-import type { Product, ProductVariant, Gender } from '../../types';
+import type { Product, ProductVariant, Gender, Order } from '../../types';
+import {
+  getAllOrdersAdminApi,
+  updateOrderStatusAdminApi,
+  updateOrderReturnStatusAdminApi,
+  approveOrderReturnAdminApi,
+  rejectOrderReturnAdminApi,
+  getAdminCouponsApi,
+  getAdminCustomersApi,
+  getAdminCustomerDetailsApi,
+} from '../../services/authApi';
 import {
   getKnowledgeDocumentsApi,
   uploadKnowledgeDocumentApi,
@@ -90,6 +100,7 @@ export const AdminDashboard: React.FC = () => {
     | 'categories'
     | 'inventory'
     | 'orders'
+    | 'customers'
     | 'coupons'
     | 'analytics'
     | 'audit'
@@ -104,6 +115,7 @@ export const AdminDashboard: React.FC = () => {
     if (location.pathname.includes('knowledge')) return 'knowledge';
     if (location.pathname.includes('inventory')) return 'inventory';
     if (location.pathname.includes('orders')) return 'orders';
+    if (location.pathname.includes('customers')) return 'customers';
     if (location.pathname.includes('coupons')) return 'coupons';
     if (location.pathname.includes('analytics')) return 'analytics';
     if (location.pathname.includes('audit')) return 'audit';
@@ -259,6 +271,184 @@ export const AdminDashboard: React.FC = () => {
   // Local Product State
   const [productData, setProductData] = useState<Product[]>(products);
   const couponData = COUPONS;
+
+  // Backend Admin Orders, Customers & Coupons State
+  const [adminOrders, setAdminOrders] = useState<Order[]>([]);
+  const [isLoadingOrders, setIsLoadingOrders] = useState(false);
+  const [adminCoupons, setAdminCoupons] = useState<any[]>([]);
+  const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
+  const [selectedAdminOrder, setSelectedAdminOrder] = useState<Order | null>(null);
+
+  // Customer Database State
+  const [customersList, setCustomersList] = useState<any[]>([]);
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
+  const [selectedCustomerDetails, setSelectedCustomerDetails] = useState<any | null>(null);
+  const [isLoadingCustomerDetails, setIsLoadingCustomerDetails] = useState(false);
+
+  const fetchAdminOrders = async () => {
+    if (!isAdmin) return;
+    setIsLoadingOrders(true);
+    try {
+      const data = await getAllOrdersAdminApi();
+      setAdminOrders(data);
+    } catch (e) {
+      console.warn('Failed to load admin orders:', e);
+    } finally {
+      setIsLoadingOrders(false);
+    }
+  };
+
+  const fetchCustomers = async (searchQuery?: string) => {
+    if (!isAdmin) return;
+    setIsLoadingCustomers(true);
+    try {
+      const data = await getAdminCustomersApi(0, 50, searchQuery !== undefined ? searchQuery : customerSearch);
+      if (data && data.customers) {
+        setCustomersList(data.customers);
+      }
+    } catch (e) {
+      console.warn('Failed to load customers:', e);
+    } finally {
+      setIsLoadingCustomers(false);
+    }
+  };
+
+  const handleInspectCustomer = async (cust: any) => {
+    setSelectedCustomer(cust);
+    setIsLoadingCustomerDetails(true);
+    try {
+      const details = await getAdminCustomerDetailsApi(cust.id);
+      setSelectedCustomerDetails(details);
+    } catch (e) {
+      console.warn('Failed to load customer details:', e);
+    } finally {
+      setIsLoadingCustomerDetails(false);
+    }
+  };
+
+  const fetchAdminCoupons = async () => {
+    if (!isAdmin) return;
+    setIsLoadingCoupons(true);
+    try {
+      const data = await getAdminCouponsApi();
+      setAdminCoupons(data);
+    } catch (e) {
+      console.warn('Failed to load admin coupons:', e);
+    } finally {
+      setIsLoadingCoupons(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchAdminOrders();
+      fetchAdminCoupons();
+      fetchCustomers();
+
+      // Real-time synchronization polling every 3.5s for instant updates
+      const interval = setInterval(() => {
+        if (activeTab === 'orders' || activeTab === 'customers' || activeTab === 'ai-conversations') {
+          fetchAdminOrders();
+          if (activeTab === 'customers') {
+            fetchCustomers();
+          }
+        }
+      }, 3500);
+
+      return () => clearInterval(interval);
+    }
+  }, [isAdmin, activeTab]);
+
+  const handleUpdateOrderStatus = async (orderId: string | number, newStatus: string) => {
+    try {
+      const updated = await updateOrderStatusAdminApi(orderId, newStatus);
+      setAdminOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
+      if (selectedAdminOrder && selectedAdminOrder.id === updated.id) {
+        setSelectedAdminOrder(updated);
+      }
+      fetchAdminOrders();
+      if (selectedCustomer) {
+        handleInspectCustomer(selectedCustomer);
+      }
+    } catch (err: any) {
+      alert(`Failed to update order status: ${err?.message || err}`);
+    }
+  };
+
+  const handleUpdateOrderReturnStatus = async (orderId: string | number, newReturnStatus: string) => {
+    try {
+      const updated = await updateOrderReturnStatusAdminApi(orderId, newReturnStatus);
+      setAdminOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
+      if (selectedAdminOrder && selectedAdminOrder.id === updated.id) {
+        setSelectedAdminOrder(updated);
+      }
+      fetchAdminOrders();
+      if (selectedCustomer) {
+        handleInspectCustomer(selectedCustomer);
+      }
+    } catch (err: any) {
+      alert(`Failed to update return status: ${err?.message || err}`);
+    }
+  };
+
+  const handleApproveOrderReturn = async (orderId: string | number) => {
+    try {
+      const updated = await approveOrderReturnAdminApi(orderId);
+      setAdminOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
+      if (selectedAdminOrder && selectedAdminOrder.id === updated.id) {
+        setSelectedAdminOrder(updated);
+      }
+      // Re-fetch backend orders and customer database to ensure complete sync
+      fetchAdminOrders();
+      fetchCustomers();
+      if (selectedCustomer) {
+        handleInspectCustomer(selectedCustomer);
+      }
+      alert(`Return and refund for Order #${updated.orderNumber || updated.id} approved! Refund ref: ${updated.refundReference}`);
+    } catch (err: any) {
+      alert(`Failed to approve return: ${err?.message || err}`);
+    }
+  };
+
+  const handleRejectOrderReturn = async (orderId: string | number) => {
+    const reason = prompt('Please enter the reason for rejecting this return:');
+    if (reason === null) return;
+    try {
+      const updated = await rejectOrderReturnAdminApi(orderId, reason);
+      setAdminOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
+      if (selectedAdminOrder && selectedAdminOrder.id === updated.id) {
+        setSelectedAdminOrder(updated);
+      }
+      fetchAdminOrders();
+      fetchCustomers();
+      if (selectedCustomer) {
+        handleInspectCustomer(selectedCustomer);
+      }
+      alert(`Return for Order #${updated.orderNumber || updated.id} rejected.`);
+    } catch (err: any) {
+      alert(`Failed to reject return: ${err?.message || err}`);
+    }
+  };
+
+  const [orderFilter, setOrderFilter] = useState<'all' | 'returns' | 'awaiting_approval'>('all');
+
+  const allDisplayOrders = adminOrders.length > 0 ? adminOrders : orders;
+  const returnsCount = allDisplayOrders.filter(
+    (o) => o.returnStatus && o.returnStatus !== 'NONE'
+  ).length;
+  const awaitingApprovalCount = allDisplayOrders.filter(
+    (o) => o.returnStatus === 'AWAITING_APPROVAL' || o.approvalType === 'ADMIN_PENDING'
+  ).length;
+
+  const displayOrders = orderFilter === 'returns'
+    ? allDisplayOrders.filter((o) => o.returnStatus && o.returnStatus !== 'NONE')
+    : orderFilter === 'awaiting_approval'
+    ? allDisplayOrders.filter((o) => o.returnStatus === 'AWAITING_APPROVAL' || o.approvalType === 'ADMIN_PENDING')
+    : allDisplayOrders;
+
+  const displayCoupons = adminCoupons.length > 0 ? adminCoupons : couponData;
 
   // Toggle status (Active / Archived)
   const toggleProductStatus = (id: string | number) => {
@@ -645,7 +835,8 @@ export const AdminDashboard: React.FC = () => {
                 { id: 'products', label: 'Products', icon: Package, count: productData.length },
                 { id: 'categories', label: 'Categories', icon: FolderTree, count: Object.keys(categoriesSummary).length },
                 { id: 'inventory', label: 'Inventory', icon: Layers },
-                { id: 'orders', label: 'Orders', icon: ShoppingCart, count: orders.length },
+                { id: 'orders', label: 'Orders', icon: ShoppingCart, count: displayOrders.length },
+                { id: 'customers', label: 'Customer Database', icon: Users, count: customersList.length },
                 { id: 'coupons', label: 'Coupons & Offers', icon: Tag },
               ].map((item) => {
                 const Icon = item.icon;
@@ -1874,15 +2065,65 @@ export const AdminDashboard: React.FC = () => {
            ======================================================== */}
         {activeTab === 'orders' && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between pb-6 border-b border-[#e5e5e5]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#e5e5e5]">
               <div>
                 <span className="text-xs uppercase font-bold tracking-widest text-[#8a8a8a] block">
                   ORDER FULFILLMENT
                 </span>
                 <h1 className="text-2xl sm:text-3xl font-extrabold uppercase tracking-tight text-black">
-                  Customer Orders ({orders.length})
+                  Customer Orders ({displayOrders.length})
                 </h1>
+                <div className="flex items-center gap-2 mt-3">
+                  <button
+                    onClick={() => setOrderFilter('all')}
+                    className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                      orderFilter === 'all'
+                        ? 'bg-black text-white'
+                        : 'bg-[#f4f4f4] text-[#5e5e5e] hover:bg-[#e5e5e5]'
+                    }`}
+                  >
+                    All Orders ({allDisplayOrders.length})
+                  </button>
+                  <button
+                    onClick={() => setOrderFilter('returns')}
+                    className={`px-3 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      orderFilter === 'returns'
+                        ? 'bg-[#c2410c] text-white shadow-xs'
+                        : 'bg-[#fff7ed] text-[#c2410c] hover:bg-[#ffedd5] border border-[#ffedd5]'
+                    }`}
+                  >
+                    <span>Return Requests</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                      orderFilter === 'returns' ? 'bg-white text-[#c2410c]' : 'bg-[#c2410c] text-white'
+                    }`}>
+                      {returnsCount}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => setOrderFilter('awaiting_approval')}
+                    className={`px-3 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      orderFilter === 'awaiting_approval'
+                        ? 'bg-amber-600 text-white shadow-xs'
+                        : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
+                    }`}
+                  >
+                    <span>⚠️ Awaiting Approval</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                      orderFilter === 'awaiting_approval' ? 'bg-white text-amber-800' : 'bg-amber-800 text-white'
+                    }`}>
+                      {awaitingApprovalCount}
+                    </span>
+                  </button>
+                </div>
               </div>
+              <button
+                onClick={fetchAdminOrders}
+                disabled={isLoadingOrders}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-black hover:bg-black hover:text-white text-xs font-semibold text-black transition-all self-start sm:self-auto"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isLoadingOrders ? 'animate-spin' : ''}`} />
+                <span>Refresh Orders</span>
+              </button>
             </div>
 
             <div className="bg-white border border-[#e5e5e5] rounded-xl overflow-hidden shadow-sm">
@@ -1892,33 +2133,150 @@ export const AdminDashboard: React.FC = () => {
                     <th className="py-3.5 px-4">Order ID</th>
                     <th className="py-3.5 px-4">Customer</th>
                     <th className="py-3.5 px-4">Address</th>
-                    <th className="py-3.5 px-4">Items Count</th>
+                    <th className="py-3.5 px-4">Items</th>
                     <th className="py-3.5 px-4">Total</th>
-                    <th className="py-3.5 px-4">Status</th>
+                    <th className="py-3.5 px-4">Status & Update</th>
+                    <th className="py-3.5 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#e5e5e5]">
-                  {orders.map((ord) => (
-                    <tr key={ord.id} className="hover:bg-[#fcfcfc]">
-                      <td className="py-3.5 px-4 font-mono font-bold text-black">{ord.id}</td>
-                      <td className="py-3.5 px-4 font-medium">{ord.customerName}</td>
-                      <td className="py-3.5 px-4 text-[#5e5e5e]">
-                        {ord.shippingAddress.city}, {ord.shippingAddress.state}
-                      </td>
-                      <td className="py-3.5 px-4">{ord.items.length} items</td>
-                      <td className="py-3.5 px-4 font-bold text-black">
-                        ₹{ord.total.toLocaleString('en-IN')}
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <span className="px-2.5 py-0.5 bg-[#e8f5ee] text-[#167a45] rounded-full text-[10px] font-bold">
-                          {ord.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                  {orders.length === 0 && (
+                  {displayOrders.map((ord) => {
+                    const formattedAddr =
+                      ord.shippingAddressDetails?.city
+                        ? `${ord.shippingAddressDetails.city}, ${ord.shippingAddressDetails.state || ''}`
+                        : ord.city
+                        ? `${ord.city}, ${ord.state || ''}`
+                        : typeof ord.shippingAddress === 'string'
+                        ? ord.shippingAddress
+                        : `${ord.shippingAddress?.city || ''}, ${ord.shippingAddress?.state || ''}`.trim() || 'Address on file';
+
+                    return (
+                      <tr key={ord.id} className="hover:bg-[#fcfcfc]">
+                        <td className="py-3.5 px-4 font-mono font-bold text-black">
+                          <div className="flex flex-col gap-1 items-start">
+                            <span>{ord.orderNumber || ord.id}</span>
+                            {ord.orderSource === 'AI_CHATBOT' ? (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-purple-100 text-purple-900 border border-purple-200">
+                                <span>🤖</span>
+                                <span>AI Placed</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-medium uppercase bg-[#f0f0f0] text-[#777]">
+                                <span>Storefront</span>
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <p className="font-semibold text-black">{ord.customerName}</p>
+                          <p className="text-[11px] text-[#8a8a8a]">{ord.customerEmail}</p>
+                          {ord.returnStatus && ord.returnStatus !== 'NONE' && (
+                            <div className="mt-1 flex flex-col gap-0.5">
+                              <div className="flex flex-wrap items-center gap-1">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider inline-block self-start ${
+                                  ord.returnStatus === 'AWAITING_APPROVAL'
+                                    ? 'bg-amber-100 text-amber-900 border border-amber-300 font-extrabold animate-pulse'
+                                    : ord.returnStatus === 'REQUESTED'
+                                    ? 'bg-[#fff7ed] text-[#c2410c] border border-[#fed7aa]'
+                                    : ord.returnStatus === 'APPROVED'
+                                    ? 'bg-[#eff6ff] text-[#1d4ed8] border border-[#bfdbfe]'
+                                    : ord.returnStatus === 'REFUNDED'
+                                    ? 'bg-[#f0fdf4] text-[#15803d] border border-[#bbf7d0]'
+                                    : 'bg-[#fef2f2] text-[#b91c1c] border border-[#fecaca]'
+                                }`}>
+                                  {ord.returnStatus === 'AWAITING_APPROVAL' ? '⚠️ Awaiting Approval' : `Return: ${ord.returnStatus}`}
+                                </span>
+                                {ord.returnSource === 'AI_CONCIERGE' && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase bg-indigo-100 text-indigo-900 border border-indigo-200">
+                                    <span>🤖</span>
+                                    <span>Via Chatbot</span>
+                                  </span>
+                                )}
+                                {ord.returnSource === 'WEB_PORTAL' && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase bg-sky-50 text-sky-800 border border-sky-200">
+                                    <span>🌐</span>
+                                    <span>Via Portal</span>
+                                  </span>
+                                )}
+                              </div>
+                              {ord.refundUpiId && (
+                                <span className="text-[10px] font-mono text-[#555]">UPI: {ord.refundUpiId}</span>
+                              )}
+                              {ord.refundAmount && (
+                                <span className="text-[10px] font-semibold text-[#15803d]">Refund: ₹{Number(ord.refundAmount).toLocaleString('en-IN')}</span>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 text-[#5e5e5e] max-w-xs truncate">
+                          {formattedAddr}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-1.5">
+                            {ord.items.slice(0, 3).map((item, idx) => (
+                              <img
+                                key={item.id || idx}
+                                src={item.image || item.imageUrl || (item.productId ? `/images/${item.productId}.jpg` : '/images/15970.jpg')}
+                                alt={item.productName}
+                                className="w-7 h-9 object-cover rounded bg-[#f4f4f4] border border-[#e5e5e5]"
+                                onError={(e) => {
+                                  const target = e.currentTarget;
+                                  if (item.productId && !target.src.includes(`/images/${item.productId}.jpg`)) {
+                                    target.src = `/images/${item.productId}.jpg`;
+                                  } else if (!target.src.includes('/images/15970.jpg')) {
+                                    target.src = '/images/15970.jpg';
+                                  }
+                                }}
+                              />
+                            ))}
+                            {ord.items.length > 3 && (
+                              <span className="text-[10px] text-[#8a8a8a] font-bold">+{ord.items.length - 3}</span>
+                            )}
+                            <span className="text-[11px] text-[#8a8a8a] ml-1">({ord.items.length})</span>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 font-bold text-black">
+                          ₹{ord.total.toLocaleString('en-IN')}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <select
+                            value={ord.status}
+                            onChange={(e) => handleUpdateOrderStatus(ord.id, e.target.value)}
+                            className="bg-white border border-[#d5d5d5] rounded-full px-2.5 py-1 text-[11px] font-semibold text-black focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
+                          >
+                            <option value="CONFIRMED">CONFIRMED</option>
+                            <option value="PROCESSING">PROCESSING</option>
+                            <option value="SHIPPED">SHIPPED</option>
+                            <option value="OUT_FOR_DELIVERY">OUT_FOR_DELIVERY</option>
+                            <option value="DELIVERED">DELIVERED</option>
+                            <option value="CANCELLED">CANCELLED</option>
+                          </select>
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {(ord.returnStatus === 'AWAITING_APPROVAL' || ord.approvalType === 'ADMIN_PENDING') && (
+                              <button
+                                onClick={() => handleApproveOrderReturn(ord.id)}
+                                className="px-3 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-full text-[11px] font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1 animate-pulse"
+                                title="Authorize High-Value Return"
+                              >
+                                <span>✓ Approve Return</span>
+                              </button>
+                            )}
+                            <button
+                              onClick={() => setSelectedAdminOrder(ord)}
+                              className="px-3 py-1 bg-black text-white hover:bg-[#222222] rounded-full text-[11px] font-semibold transition-colors"
+                            >
+                              Inspect
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {displayOrders.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="py-12 text-center text-[#8a8a8a]">
+                      <td colSpan={7} className="py-12 text-center text-[#8a8a8a]">
                         No active orders recorded yet. Place an order on the storefront to test order tracking.
                       </td>
                     </tr>
@@ -1926,6 +2284,626 @@ export const AdminDashboard: React.FC = () => {
                 </tbody>
               </table>
             </div>
+
+            {/* Selected Order Modal */}
+            {selectedAdminOrder && (
+              <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+                <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
+                  <div className="flex items-center justify-between pb-4 border-b border-[#e5e5e5]">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold tracking-widest text-[#8a8a8a] block">
+                        ORDER FULFILLMENT AUDIT
+                      </span>
+                      <h2 className="text-xl font-bold uppercase tracking-tight text-black">
+                        Order #{selectedAdminOrder.orderNumber || selectedAdminOrder.id}
+                      </h2>
+                    </div>
+                    <button
+                      onClick={() => setSelectedAdminOrder(null)}
+                      className="w-8 h-8 rounded-full bg-[#f4f4f4] hover:bg-black hover:text-white flex items-center justify-center transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="bg-[#f9f9f9] p-4 rounded-2xl border border-[#eeeeee] space-y-2 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-[#8a8a8a]">Customer:</span>
+                      <span className="font-semibold text-black">{selectedAdminOrder.customerName} ({selectedAdminOrder.customerEmail})</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#8a8a8a]">Phone:</span>
+                      <span className="text-black">{selectedAdminOrder.customerPhone || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#8a8a8a]">Payment:</span>
+                      <span className="font-semibold text-black">{selectedAdminOrder.paymentMethod}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#8a8a8a]">Tracking Number:</span>
+                      <span className="font-mono font-bold text-black">{selectedAdminOrder.trackingNumber || 'TRK-PENDING'}</span>
+                    </div>
+                    <div className="flex justify-between items-center pt-2 border-t border-[#eeeeee]">
+                      <span className="text-[#8a8a8a]">Order Channel:</span>
+                      {selectedAdminOrder.orderSource === 'AI_CHATBOT' ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-purple-100 text-purple-900 border border-purple-200">
+                          <span>🤖</span>
+                          <span>24/7 AI Autonomous Chatbot</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase bg-[#f0f0f0] text-[#666]">
+                          <span>🌐</span>
+                          <span>Online Storefront Checkout</span>
+                        </span>
+                      )}
+                    </div>
+                    {selectedAdminOrder.returnSource && selectedAdminOrder.returnSource !== 'NONE' && (
+                      <div className="flex justify-between items-center pt-1">
+                        <span className="text-[#8a8a8a]">Return Channel:</span>
+                        {selectedAdminOrder.returnSource === 'AI_CONCIERGE' ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-indigo-100 text-indigo-900 border border-indigo-200">
+                            <span>🤖</span>
+                            <span>Processed via AI Chatbot Concierge</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase bg-sky-50 text-sky-800 border border-sky-200">
+                            <span>🌐</span>
+                            <span>Customer Account Portal</span>
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Return Request Management for Admin */}
+                  {selectedAdminOrder.returnStatus && selectedAdminOrder.returnStatus !== 'NONE' && (
+                    <div className={`p-4 rounded-2xl space-y-3 ${
+                      selectedAdminOrder.returnStatus === 'AWAITING_APPROVAL'
+                        ? 'bg-amber-50 border border-amber-300'
+                        : 'bg-[#fff7ed] border border-[#fed7aa]'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <span className={`text-[10px] uppercase font-bold tracking-widest ${
+                          selectedAdminOrder.returnStatus === 'AWAITING_APPROVAL' ? 'text-amber-900 font-extrabold' : 'text-[#9a3412]'
+                        }`}>
+                          {selectedAdminOrder.returnStatus === 'AWAITING_APPROVAL'
+                            ? '⚠️ High-Value Return Requiring Supervisor Authorization'
+                            : 'Customer Return & Refund Request'}
+                        </span>
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                          selectedAdminOrder.returnStatus === 'AWAITING_APPROVAL'
+                            ? 'bg-amber-200 text-amber-900 font-extrabold'
+                            : 'bg-[#ffedd5] text-[#c2410c]'
+                        }`}>
+                          Current: {selectedAdminOrder.returnStatus}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs bg-white/70 p-3 rounded-xl border border-black/5">
+                        {selectedAdminOrder.refundAmount && (
+                          <div>
+                            <span className="text-[#8a8a8a] text-[10px] uppercase block font-medium">Refund Amount:</span>
+                            <span className="font-bold text-black text-sm">₹{Number(selectedAdminOrder.refundAmount).toLocaleString('en-IN')}</span>
+                          </div>
+                        )}
+                        {selectedAdminOrder.refundUpiId && (
+                          <div>
+                            <span className="text-[#8a8a8a] text-[10px] uppercase block font-medium">Payout UPI Destination:</span>
+                            <span className="font-mono font-semibold text-black">{selectedAdminOrder.refundUpiId}</span>
+                          </div>
+                        )}
+                        {selectedAdminOrder.returnTrackingNumber && (
+                          <div>
+                            <span className="text-[#8a8a8a] text-[10px] uppercase block font-medium">Return Tracking:</span>
+                            <span className="font-mono text-black">{selectedAdminOrder.returnTrackingNumber}</span>
+                          </div>
+                        )}
+                        {selectedAdminOrder.refundReference && (
+                          <div>
+                            <span className="text-[#8a8a8a] text-[10px] uppercase block font-medium">Refund Reference:</span>
+                            <span className="font-mono text-black">{selectedAdminOrder.refundReference}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {selectedAdminOrder.returnReason && (
+                        <p className="text-xs text-black font-semibold">
+                          Return Reason: <span className="font-normal text-[#5e5e5e]">{selectedAdminOrder.returnReason}</span>
+                        </p>
+                      )}
+                      {selectedAdminOrder.returnComment && (
+                        <p className="text-xs text-black font-semibold">
+                          Customer Note: <span className="font-normal text-[#5e5e5e]">{selectedAdminOrder.returnComment}</span>
+                        </p>
+                      )}
+
+                      <div className="pt-2 border-t border-black/10 flex flex-wrap items-center gap-2">
+                        {selectedAdminOrder.returnStatus === 'AWAITING_APPROVAL' ? (
+                          <>
+                            <button
+                              onClick={() => handleApproveOrderReturn(selectedAdminOrder.id)}
+                              className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-full text-xs font-bold transition-all shadow-xs cursor-pointer"
+                            >
+                              ✓ Approve High-Value Return
+                            </button>
+                            <button
+                              onClick={() => handleRejectOrderReturn(selectedAdminOrder.id)}
+                              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-full text-xs font-bold transition-all shadow-xs cursor-pointer"
+                            >
+                              ✕ Reject Return
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-[11px] font-bold text-black">Update Return Status:</span>
+                            <button
+                              onClick={() => handleUpdateOrderReturnStatus(selectedAdminOrder.id, 'APPROVED')}
+                              className="px-2.5 py-1 bg-[#1d4ed8] text-white hover:bg-[#1e40af] rounded-full text-[10px] font-bold transition-all cursor-pointer"
+                            >
+                              Approve Return
+                            </button>
+                            <button
+                              onClick={() => handleUpdateOrderReturnStatus(selectedAdminOrder.id, 'RETURNED')}
+                              className="px-2.5 py-1 bg-[#4338ca] text-white hover:bg-[#3730a3] rounded-full text-[10px] font-bold transition-all cursor-pointer"
+                            >
+                              Mark Received
+                            </button>
+                            <button
+                              onClick={() => handleUpdateOrderReturnStatus(selectedAdminOrder.id, 'REFUNDED')}
+                              className="px-2.5 py-1 bg-[#15803d] text-white hover:bg-[#166534] rounded-full text-[10px] font-bold transition-all cursor-pointer"
+                            >
+                              Issue Refund
+                            </button>
+                            <button
+                              onClick={() => handleUpdateOrderReturnStatus(selectedAdminOrder.id, 'REJECTED')}
+                              className="px-2.5 py-1 bg-[#b91c1c] text-white hover:bg-[#991b1b] rounded-full text-[10px] font-bold transition-all cursor-pointer"
+                            >
+                              Reject Return
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    <span className="text-xs font-bold uppercase tracking-wider text-black block">
+                      Purchased Items ({selectedAdminOrder.items.length})
+                    </span>
+                    <div className="divide-y divide-[#eeeeee]">
+                      {selectedAdminOrder.items.map((it) => (
+                        <div key={it.id} className="py-3 flex items-center gap-4 text-xs">
+                          <img
+                            src={it.image || it.imageUrl || (it.productId ? `/images/${it.productId}.jpg` : '/images/15970.jpg')}
+                            alt={it.productName}
+                            className="w-12 h-14 object-cover rounded-xl bg-[#f4f4f4] border border-[#e5e5e5]"
+                            onError={(e) => {
+                              const target = e.currentTarget;
+                              if (it.productId && !target.src.includes(`/images/${it.productId}.jpg`)) {
+                                target.src = `/images/${it.productId}.jpg`;
+                              } else if (!target.src.includes('/images/15970.jpg')) {
+                                target.src = '/images/15970.jpg';
+                              }
+                            }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-bold text-black truncate">{it.productName}</h4>
+                            <p className="text-[11px] text-[#8a8a8a]">
+                              SKU: {it.sku} • Size: {it.size} • Color: {it.color} • Qty: {it.quantity}
+                            </p>
+                          </div>
+                          <span className="font-bold text-black">
+                            ₹{it.finalPrice.toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-[#e5e5e5] flex items-center justify-between">
+                    <div>
+                      <span className="text-xs text-[#8a8a8a] block">Total Amount</span>
+                      <span className="text-xl font-extrabold text-black">
+                        ₹{selectedAdminOrder.total.toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={selectedAdminOrder.status}
+                        onChange={(e) => handleUpdateOrderStatus(selectedAdminOrder.id, e.target.value)}
+                        className="bg-white border border-[#d5d5d5] rounded-full px-3 py-1.5 text-xs font-semibold text-black focus:outline-none"
+                      >
+                        <option value="CONFIRMED">CONFIRMED</option>
+                        <option value="PROCESSING">PROCESSING</option>
+                        <option value="SHIPPED">SHIPPED</option>
+                        <option value="OUT_FOR_DELIVERY">OUT_FOR_DELIVERY</option>
+                        <option value="DELIVERED">DELIVERED</option>
+                        <option value="CANCELLED">CANCELLED</option>
+                      </select>
+                      <button
+                        onClick={() => setSelectedAdminOrder(null)}
+                        className="px-4 py-1.5 bg-black text-white rounded-full text-xs font-semibold"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ========================================================
+            5.5 CUSTOMER DATABASE (REGISTRY & PROFILES)
+           ======================================================== */}
+        {activeTab === 'customers' && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#e5e5e5]">
+              <div>
+                <span className="text-xs uppercase font-bold tracking-widest text-[#8a8a8a] block">
+                  CUSTOMER REGISTRY & ACCOUNTS
+                </span>
+                <div className="flex items-center gap-3 mt-1">
+                  <h1 className="text-2xl sm:text-3xl font-extrabold uppercase tracking-tight text-black">
+                    Customer Database
+                  </h1>
+                  <span className="px-3 py-1 bg-black text-white text-xs font-bold rounded-full">
+                    {customersList.length} Customers
+                  </span>
+                </div>
+                <p className="text-xs text-[#5e5e5e] mt-1 font-medium">
+                  Authoritative customer profiles, order history, lifetime spend, and return authorizations.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#8a8a8a]" />
+                  <input
+                    type="text"
+                    placeholder="Search by name, email..."
+                    value={customerSearch}
+                    onChange={(e) => {
+                      setCustomerSearch(e.target.value);
+                      fetchCustomers(e.target.value);
+                    }}
+                    className="pl-8 pr-3 py-1.5 bg-white border border-[#e5e5e5] rounded-full text-xs text-black focus:outline-none focus:ring-1 focus:ring-black w-48 sm:w-64"
+                  />
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => fetchCustomers()}
+                  disabled={isLoadingCustomers}
+                  className="flex items-center gap-1.5"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isLoadingCustomers ? 'animate-spin' : ''}`} />
+                  <span>Refresh</span>
+                </Button>
+              </div>
+            </div>
+
+            <div className="bg-white border border-[#e5e5e5] rounded-xl overflow-hidden shadow-sm">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-[#f4f4f4] text-[#5e5e5e] font-semibold uppercase">
+                  <tr>
+                    <th className="py-3.5 px-4">Customer</th>
+                    <th className="py-3.5 px-4">Contact</th>
+                    <th className="py-3.5 px-4">Role & Status</th>
+                    <th className="py-3.5 px-4">Orders Placed</th>
+                    <th className="py-3.5 px-4">Lifetime Spend</th>
+                    <th className="py-3.5 px-4">Member Since</th>
+                    <th className="py-3.5 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#e5e5e5]">
+                  {customersList.map((cust) => {
+                    const initials = (cust.name || cust.email || 'CU')
+                      .split(' ')
+                      .map((n: string) => n[0])
+                      .join('')
+                      .toUpperCase()
+                      .slice(0, 2);
+
+                    return (
+                      <tr key={cust.id} className="hover:bg-[#fcfcfc] transition-colors">
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center font-bold text-xs">
+                              {initials}
+                            </div>
+                            <div>
+                              <p className="font-semibold text-black">{cust.name || 'Customer'}</p>
+                              <p className="text-[10px] text-[#8a8a8a] font-mono">UID: #{cust.id}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <p className="text-black font-medium">{cust.email}</p>
+                          <p className="text-[11px] text-[#8a8a8a]">{cust.phone || 'No phone on file'}</p>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-1.5">
+                            <span className="px-2 py-0.5 bg-[#f4f4f4] text-black border border-[#e5e5e5] rounded-full text-[10px] font-bold">
+                              {cust.role || 'CUSTOMER'}
+                            </span>
+                            <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full text-[10px] font-bold">
+                              {cust.status || 'ACTIVE'}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 font-semibold text-black">
+                          {cust.orderCount || 0} order{cust.orderCount === 1 ? '' : 's'}
+                        </td>
+                        <td className="py-3.5 px-4 font-bold text-black">
+                          ₹{Number(cust.totalSpend || 0).toLocaleString('en-IN')}
+                        </td>
+                        <td className="py-3.5 px-4 text-[#8a8a8a]">
+                          {cust.createdAt ? new Date(cust.createdAt).toLocaleDateString() : 'N/A'}
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <button
+                            onClick={() => handleInspectCustomer(cust)}
+                            className="px-3.5 py-1.5 bg-black text-white hover:bg-[#222222] rounded-full text-[11px] font-semibold transition-colors cursor-pointer"
+                          >
+                            Inspect Profile
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {customersList.length === 0 && !isLoadingCustomers && (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-[#8a8a8a]">
+                        No customers found in database matching search criteria.
+                      </td>
+                    </tr>
+                  )}
+                  {isLoadingCustomers && (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-[#8a8a8a]">
+                        <RefreshCw className="w-5 h-5 animate-spin mx-auto text-black mb-2" />
+                        <span>Loading customer records...</span>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Customer Details Modal */}
+            {selectedCustomer && (
+              <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+                <div className="bg-white border border-[#e5e5e5] rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-scale-in">
+                  <div className="p-6 border-b border-[#e5e5e5] flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center font-extrabold text-sm">
+                        {(selectedCustomer.name || selectedCustomer.email || 'CU').slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg font-bold text-black">{selectedCustomer.name || 'Customer Profile'}</h3>
+                          <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full text-[10px] font-bold">
+                            {selectedCustomer.status || 'ACTIVE'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-[#5e5e5e]">{selectedCustomer.email} • {selectedCustomer.phone || 'Phone on file'}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedCustomer(null);
+                        setSelectedCustomerDetails(null);
+                      }}
+                      className="p-1.5 rounded-full hover:bg-[#f4f4f4] text-[#8a8a8a] hover:text-black transition-colors cursor-pointer"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <div className="p-6 overflow-y-auto space-y-6 flex-1">
+                    {/* Stat Badges */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="p-4 bg-[#f8f8f8] rounded-xl border border-[#e5e5e5]">
+                        <span className="text-[10px] uppercase font-bold text-[#8a8a8a] block tracking-wider">
+                          Lifetime Expenditure
+                        </span>
+                        <span className="text-xl font-extrabold text-black">
+                          ₹{Number(selectedCustomer.totalSpend || 0).toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                      <div className="p-4 bg-[#f8f8f8] rounded-xl border border-[#e5e5e5]">
+                        <span className="text-[10px] uppercase font-bold text-[#8a8a8a] block tracking-wider">
+                          Total Orders Placed
+                        </span>
+                        <span className="text-xl font-extrabold text-black">
+                          {selectedCustomer.orderCount || 0}
+                        </span>
+                      </div>
+                      <div className="p-4 bg-[#f8f8f8] rounded-xl border border-[#e5e5e5]">
+                        <span className="text-[10px] uppercase font-bold text-[#8a8a8a] block tracking-wider">
+                          Account Role
+                        </span>
+                        <span className="text-xl font-extrabold text-black">
+                          {selectedCustomer.role || 'CUSTOMER'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Customer Orders History */}
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-black mb-3">
+                        Orders Placed by Customer ({selectedCustomerDetails?.orders?.length || 0})
+                      </h4>
+
+                      {isLoadingCustomerDetails ? (
+                        <div className="py-12 text-center text-[#8a8a8a]">
+                          <RefreshCw className="w-5 h-5 animate-spin mx-auto text-black mb-2" />
+                          <span>Loading customer orders...</span>
+                        </div>
+                      ) : selectedCustomerDetails?.orders?.length > 0 ? (
+                        <div className="space-y-4">
+                          {selectedCustomerDetails.orders.map((ord: any) => (
+                            <div key={ord.id} className="p-4 bg-white border border-[#e5e5e5] rounded-xl shadow-xs space-y-3">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-[#f4f4f4]">
+                                <div>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-mono font-bold text-black text-sm">#{ord.orderNumber || ord.id}</span>
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                      ord.status === 'DELIVERED'
+                                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                        : ord.status === 'RETURNED' || ord.status === 'REFUNDED'
+                                        ? 'bg-indigo-50 text-indigo-800 border border-indigo-200'
+                                        : 'bg-[#f4f4f4] text-black border border-[#e5e5e5]'
+                                    }`}>
+                                      {ord.status}
+                                    </span>
+                                    {ord.orderSource === 'AI_CHATBOT' && (
+                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-purple-100 text-purple-900 border border-purple-200">
+                                        <span>🤖</span>
+                                        <span>AI Placed</span>
+                                      </span>
+                                    )}
+                                    {ord.returnSource === 'AI_CONCIERGE' && (
+                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase bg-indigo-100 text-indigo-900 border border-indigo-200">
+                                        <span>🤖</span>
+                                        <span>Chatbot Return</span>
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-[11px] text-[#8a8a8a]">
+                                    Placed: {new Date(ord.createdAt).toLocaleString()} • Carrier: {ord.carrier}
+                                  </span>
+                                </div>
+                                <span className="text-sm font-extrabold text-black">
+                                  ₹{Number(ord.total || 0).toLocaleString('en-IN')}
+                                </span>
+                              </div>
+
+                              {/* Return & Refund Information */}
+                              {ord.returnStatus && ord.returnStatus !== 'NONE' && (
+                                <div className="p-3 bg-amber-50/60 border border-amber-200 rounded-lg space-y-2">
+                                  <div className="flex items-center justify-between flex-wrap gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs font-bold text-amber-950">Return Status:</span>
+                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                                        ord.returnStatus === 'APPROVED'
+                                          ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                                          : ord.returnStatus === 'AWAITING_APPROVAL'
+                                          ? 'bg-amber-100 text-amber-900 border border-amber-300 animate-pulse'
+                                          : ord.returnStatus === 'REFUNDED'
+                                          ? 'bg-green-100 text-green-900 border border-green-300'
+                                          : 'bg-indigo-100 text-indigo-900 border border-indigo-300'
+                                      }`}>
+                                        {ord.returnStatus === 'AWAITING_APPROVAL' ? '⚠️ Awaiting Supervisor Approval' : ord.returnStatus}
+                                      </span>
+                                    </div>
+
+                                    {(ord.returnStatus === 'AWAITING_APPROVAL' || ord.approvalType === 'ADMIN_PENDING') && (
+                                      <div className="flex items-center gap-1.5">
+                                        <button
+                                          onClick={async () => {
+                                            await handleApproveOrderReturn(ord.id);
+                                            handleInspectCustomer(selectedCustomer);
+                                          }}
+                                          className="px-3 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-full text-[11px] font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1"
+                                        >
+                                          <span>✓ Approve Return</span>
+                                        </button>
+                                        <button
+                                          onClick={async () => {
+                                            await handleRejectOrderReturn(ord.id);
+                                            handleInspectCustomer(selectedCustomer);
+                                          }}
+                                          className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-full text-[11px] font-bold transition-all shadow-xs cursor-pointer"
+                                        >
+                                          <span>✕ Reject</span>
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] pt-1 border-t border-amber-200/60">
+                                    {ord.refundReference && (
+                                      <div>
+                                        <span className="text-[#8a8a8a] block text-[10px] uppercase font-bold">Refund Reference:</span>
+                                        <span className="font-mono font-semibold text-black">{ord.refundReference}</span>
+                                      </div>
+                                    )}
+                                    {ord.returnTrackingNumber && (
+                                      <div>
+                                        <span className="text-[#8a8a8a] block text-[10px] uppercase font-bold">Return Tracking:</span>
+                                        <span className="font-mono font-semibold text-black">{ord.returnTrackingNumber}</span>
+                                      </div>
+                                    )}
+                                    {ord.refundUpiId && (
+                                      <div>
+                                        <span className="text-[#8a8a8a] block text-[10px] uppercase font-bold">Refund UPI Destination:</span>
+                                        <span className="font-mono font-semibold text-black">{ord.refundUpiId}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Order Items */}
+                              <div className="space-y-1.5">
+                                <span className="text-[10px] uppercase font-bold tracking-wider text-[#8a8a8a] block">
+                                  Items ({ord.items?.length || 0}):
+                                </span>
+                                <div className="space-y-1">
+                                  {ord.items?.map((item: any, idx: number) => (
+                                    <div key={item.id || idx} className="flex items-center justify-between text-xs py-1">
+                                      <div className="flex items-center gap-2">
+                                        <img
+                                          src={item.image || item.imageUrl || `/images/${item.productId}.jpg`}
+                                          alt={item.productName || item.name}
+                                          className="w-7 h-9 object-cover rounded bg-[#f4f4f4] border border-[#e5e5e5]"
+                                          onError={(e) => {
+                                            const target = e.currentTarget;
+                                            if (!target.src.includes('/images/15970.jpg')) {
+                                              target.src = '/images/15970.jpg';
+                                            }
+                                          }}
+                                        />
+                                        <div>
+                                          <span className="font-semibold text-black">{item.productName || item.name}</span>
+                                          <span className="text-[11px] text-[#8a8a8a] ml-1.5">Size: {item.size} • Qty: {item.quantity}</span>
+                                        </div>
+                                      </div>
+                                      <span className="font-semibold text-black">
+                                        ₹{Number(item.finalPrice || item.unitPrice * item.quantity || 0).toLocaleString('en-IN')}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-[#8a8a8a] py-6 text-center bg-[#f8f8f8] rounded-xl border border-[#e5e5e5]">
+                          No orders placed by this customer yet.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="p-4 border-t border-[#e5e5e5] bg-[#fcfcfc] flex items-center justify-end">
+                    <button
+                      onClick={() => {
+                        setSelectedCustomer(null);
+                        setSelectedCustomerDetails(null);
+                      }}
+                      className="px-4 py-2 bg-black text-white rounded-full text-xs font-semibold hover:bg-[#222222] transition-colors cursor-pointer"
+                    >
+                      Close Profile
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1934,15 +2912,23 @@ export const AdminDashboard: React.FC = () => {
            ======================================================== */}
         {activeTab === 'coupons' && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between pb-6 border-b border-[#e5e5e5]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#e5e5e5]">
               <div>
                 <span className="text-xs uppercase font-bold tracking-widest text-[#8a8a8a] block">
                   PROMOTIONS & DISCOUNTS
                 </span>
                 <h1 className="text-2xl sm:text-3xl font-extrabold uppercase tracking-tight text-black">
-                  Coupon Management
+                  Coupon Management ({displayCoupons.length})
                 </h1>
               </div>
+              <button
+                onClick={fetchAdminCoupons}
+                disabled={isLoadingCoupons}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-black hover:bg-black hover:text-white text-xs font-semibold text-black transition-all"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isLoadingCoupons ? 'animate-spin' : ''}`} />
+                <span>Refresh Coupons</span>
+              </button>
             </div>
 
             <div className="bg-white border border-[#e5e5e5] rounded-xl overflow-hidden shadow-sm">
@@ -1957,21 +2943,25 @@ export const AdminDashboard: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#e5e5e5]">
-                  {couponData.map((c) => (
-                    <tr key={c.code} className="hover:bg-[#fcfcfc]">
-                      <td className="py-3 px-4 font-mono font-bold text-black">{c.code}</td>
-                      <td className="py-3 px-4 capitalize">{c.type.toLowerCase().replace('_', ' ')}</td>
-                      <td className="py-3 px-4 font-semibold text-black">
-                        {c.type === 'PERCENTAGE' ? `${c.value}%` : c.type === 'FIXED_AMOUNT' ? `₹${c.value}` : 'Free'}
-                      </td>
-                      <td className="py-3 px-4">₹{c.minimumCartValue || 0}</td>
-                      <td className="py-3 px-4">
-                        <span className="px-2.5 py-0.5 bg-[#e8f5ee] text-[#167a45] rounded-full text-[10px] font-bold">
-                          {c.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {displayCoupons.map((c) => {
+                    const cType = (c.discountType || c.type || '').toString();
+                    const cVal = c.discountValue ?? c.value ?? 0;
+                    return (
+                      <tr key={c.code} className="hover:bg-[#fcfcfc]">
+                        <td className="py-3 px-4 font-mono font-bold text-black">{c.code}</td>
+                        <td className="py-3 px-4 capitalize">{cType.toLowerCase().replace('_', ' ')}</td>
+                        <td className="py-3 px-4 font-semibold text-black">
+                          {cType === 'PERCENTAGE' ? `${cVal}%` : cType === 'FIXED_AMOUNT' ? `₹${cVal}` : 'Free Delivery'}
+                        </td>
+                        <td className="py-3 px-4">₹{c.minimumCartValue || 0}</td>
+                        <td className="py-3 px-4">
+                          <span className="px-2.5 py-0.5 bg-[#e8f5ee] text-[#167a45] rounded-full text-[10px] font-bold">
+                            {c.status || 'ACTIVE'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

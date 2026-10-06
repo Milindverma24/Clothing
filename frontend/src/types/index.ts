@@ -63,7 +63,7 @@ export interface Coupon {
 }
 
 export interface OrderItem {
-  id: string;
+  id: string | number;
   productId: string | number;
   productName: string;
   sku: string;
@@ -74,6 +74,7 @@ export interface OrderItem {
   discount: number;
   finalPrice: number;
   image: string;
+  imageUrl?: string;
 }
 
 export type OrderStatus =
@@ -90,10 +91,11 @@ export type OrderStatus =
   | 'REFUNDED';
 
 export interface Order {
-  id: string;
+  id: string | number;
+  orderNumber?: string;
   customerName: string;
   customerEmail: string;
-  customerPhone: string;
+  customerPhone?: string;
   shippingAddress: {
     address: string;
     city: string;
@@ -101,15 +103,40 @@ export interface Order {
     postalCode: string;
     country: string;
   };
+  shippingAddressDetails?: {
+    address?: string;
+    city?: string;
+    state?: string;
+    postalCode?: string;
+    country?: string;
+  };
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
   items: OrderItem[];
   subtotal: number;
   discount: number;
-  couponCode?: string;
+  couponCode?: string | null;
   shipping: number;
   total: number;
   status: OrderStatus;
   paymentMethod: string;
   trackingNumber?: string;
+  carrier?: string;
+  estimatedDelivery?: string;
+  returnStatus?: string;
+  returnReason?: string | null;
+  returnComment?: string | null;
+  refundAmount?: number | null;
+  refundUpiId?: string | null;
+  refundReference?: string | null;
+  returnTrackingNumber?: string | null;
+  pickupDate?: string | null;
+  pickupAddress?: string | null;
+  approvalType?: string | null;
+  orderSource?: string;
+  returnSource?: string;
   createdAt: string;
 }
 

@@ -55,6 +55,11 @@ public class OrderItem {
     public String getProductName() { return productName; }
     public void setProductName(String productName) { this.productName = productName; }
 
+    @com.fasterxml.jackson.annotation.JsonProperty("name")
+    public String getName() {
+        return productName;
+    }
+
     public String getSku() { return sku; }
     public void setSku(String sku) { this.sku = sku; }
 
@@ -70,12 +75,33 @@ public class OrderItem {
     public BigDecimal getUnitPrice() { return unitPrice; }
     public void setUnitPrice(BigDecimal unitPrice) { this.unitPrice = unitPrice; }
 
+    @com.fasterxml.jackson.annotation.JsonProperty("price")
+    public BigDecimal getPrice() {
+        return unitPrice != null ? unitPrice : finalPrice;
+    }
+
     public BigDecimal getDiscount() { return discount; }
     public void setDiscount(BigDecimal discount) { this.discount = discount; }
 
     public BigDecimal getFinalPrice() { return finalPrice; }
     public void setFinalPrice(BigDecimal finalPrice) { this.finalPrice = finalPrice; }
 
-    public String getImageUrl() { return imageUrl; }
+    public String getImageUrl() { 
+        return (imageUrl != null && !imageUrl.isBlank()) 
+            ? imageUrl 
+            : (productId != null ? "/images/" + productId + ".jpg" : "/images/hero-campaign.jpg"); 
+    }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("image")
+    public String getImage() { 
+        return getImageUrl(); 
+    }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("image")
+    public void setImage(String image) { 
+        if (this.imageUrl == null || this.imageUrl.isBlank()) {
+            this.imageUrl = image; 
+        }
+    }
 }

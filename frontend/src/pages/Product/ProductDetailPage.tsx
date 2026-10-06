@@ -27,6 +27,17 @@ export const ProductDetailPage: React.FC = () => {
     }
   }, [slug, product]);
 
+  useEffect(() => {
+    const handleSelectSizeEvent = (e: any) => {
+      const sz = e.detail?.size;
+      if (sz && (SIZES as readonly string[]).includes(sz)) {
+        setSelectedSize(sz as 'S' | 'M' | 'L' | 'XL' | 'XXL');
+      }
+    };
+    window.addEventListener('clothing-select-size', handleSelectSizeEvent);
+    return () => window.removeEventListener('clothing-select-size', handleSelectSizeEvent);
+  }, []);
+
   if (!product) {
     return (
       <div className="py-24 text-center max-w-md mx-auto px-4">
@@ -226,7 +237,23 @@ export const ProductDetailPage: React.FC = () => {
               <span className="text-xs font-bold uppercase tracking-wider text-black">
                 Select Size
               </span>
-              <button className="text-xs text-[#5e5e5e] hover:text-black underline underline-offset-4 font-medium">
+              <button
+                type="button"
+                onClick={() => {
+                  window.dispatchEvent(
+                    new CustomEvent('open-size-guide', {
+                      detail: {
+                        productId: product.id,
+                        gender: product.gender,
+                        category: product.articleType || product.subCategory,
+                        name: product.name,
+                      },
+                    })
+                  );
+                }}
+                className="text-xs text-[#5e5e5e] hover:text-black underline underline-offset-4 font-medium cursor-pointer transition-colors"
+                title="Open interactive AI Size Guide"
+              >
                 Size Guide
               </button>
             </div>
@@ -234,7 +261,15 @@ export const ProductDetailPage: React.FC = () => {
               {SIZES.map((sz) => (
                 <button
                   key={sz}
-                  onClick={() => setSelectedSize(sz)}
+                  type="button"
+                  onClick={() => {
+                    setSelectedSize(sz);
+                    window.dispatchEvent(
+                      new CustomEvent('clothing-size-selected', {
+                        detail: { size: sz, product },
+                      })
+                    );
+                  }}
                   className={`py-3 rounded-full text-xs font-bold tracking-wider transition-all duration-150 cursor-pointer ${
                     selectedSize === sz
                       ? 'bg-black text-white shadow-sm'

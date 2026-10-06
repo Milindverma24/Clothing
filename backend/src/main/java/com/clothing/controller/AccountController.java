@@ -242,7 +242,16 @@ public class AccountController {
         @Valid @RequestBody ReturnOrderRequest request
     ) {
         Order order = orderService.requestReturn(principal.getId(), id, request);
-        return ResponseEntity.ok(ApiResponse.ok(order, "Return request submitted"));
+        return ResponseEntity.ok(ApiResponse.ok(order, "Return request processed"));
+    }
+
+    @PostMapping("/orders/return")
+    public ResponseEntity<ApiResponse<Order>> requestReturnByReference(
+        @AuthenticationPrincipal UserPrincipal principal,
+        @Valid @RequestBody ReturnOrderRequest request
+    ) {
+        Order order = orderService.requestReturn(principal.getId(), null, request);
+        return ResponseEntity.ok(ApiResponse.ok(order, "Return request processed"));
     }
 
     // REVIEWS

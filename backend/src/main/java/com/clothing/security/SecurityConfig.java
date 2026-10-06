@@ -65,16 +65,23 @@ public class SecurityConfig {
                     "/api/collections/**",
                     "/api/coupons/**",
                     "/api/chat/**",
+                    "/api/size-guides/**",
                     "/api/orders/track/**",
                     "/oauth2/**",
                     "/login/oauth2/**",
                     "/h2-console/**",
                     "/error"
                 ).permitAll()
-                // Protected customer account endpoints
-                .requestMatchers("/api/account/**", "/api/cart/validate-and-merge").authenticated()
-                // Admin dashboard endpoints
-                .requestMatchers("/api/admin/**").permitAll() // Admin dashboard uses its own auth headers/tokens or permit for local dev
+                // Protected customer commerce endpoints (orders, cart, support tickets, account)
+                .requestMatchers(
+                    "/api/account/**",
+                    "/api/orders/**",
+                    "/api/my/**",
+                    "/api/cart/**",
+                    "/api/support/**"
+                ).authenticated()
+                // Admin dashboard endpoints: strictly protected with ROLE_ADMIN
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             );
 
@@ -95,9 +102,31 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173"));
+        config.setAllowedOrigins(List.of(
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:8001",
+            "http://127.0.0.1:8001",
+            "http://localhost:3000"
+        ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "Accept", "X-User-Email"));
+        config.setAllowedHeaders(List.of(
+            "Authorization",
+            "Content-Type",
+            "Idempotency-Key",
+            "idempotency-key",
+            "X-AI-Service-Key",
+            "X-Request-ID",
+            "X-Requested-With",
+            "Accept",
+            "Origin",
+            "X-User-Email",
+            "Cache-Control",
+            "Pragma",
+            "*"
+        ));
+        config.addAllowedHeader("*");
+        config.setExposedHeaders(List.of("Authorization", "Idempotency-Key"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
 

@@ -1799,3 +1799,24 @@ JWT_SECRET=super-secret-jwt-signing-key-minimum-256-bits-for-production-security
 JWT_EXPIRATION_MS=604800000
 ```
 
+---
+
+## Production Readiness & QA Audit
+
+The platform has completed a comprehensive end-to-end quality and security audit:
+
+1. **Order Image Snapshotting**:
+   - Order items capture immutable historical snapshots of `productId`, `productName`, `imageUrl`, `size`, `color`, `quantity`, and `unitPrice`.
+   - Guaranteed dual JSON property serialization (`image` and `imageUrl`) ensures client compatibility.
+   - Client image tags include multi-tiered fallbacks and dynamic `onError` handlers.
+2. **Role-Based Access Control (RBAC)**:
+   - Admin routes (`/api/admin/**`) are strictly secured with `hasRole('ADMIN')`.
+   - Customer accounts and unauthenticated visitors receive HTTP 403 Forbidden.
+3. **Admin Fulfillment & Coupons**:
+   - Full order lifecycle management (`CONFIRMED`, `PROCESSING`, `SHIPPED`, `OUT_FOR_DELIVERY`, `DELIVERED`, `CANCELLED`).
+   - Live promotional coupon administration (`WELCOME10`, `SAVE500`, `FREESHIP`, `MILIND10`).
+4. **Intelligent Search & RAG AI**:
+   - Typo-tolerant hybrid search over the entire fashion catalog.
+   - Grounded PDF policy retrieval with document and page citation attribution.
+
+

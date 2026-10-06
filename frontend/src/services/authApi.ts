@@ -14,7 +14,13 @@ const TOKEN_KEY = 'clothing_auth_token';
 
 export function getStoredToken(): string | null {
   try {
-    return localStorage.getItem(TOKEN_KEY);
+    return (
+      localStorage.getItem(TOKEN_KEY) ||
+      localStorage.getItem('clothing_token') ||
+      localStorage.getItem('token') ||
+      localStorage.getItem('accessToken') ||
+      null
+    );
   } catch {
     return null;
   }
@@ -230,22 +236,68 @@ export async function syncWishlistApi(productIds: (string | number)[]): Promise<
 }
 
 // ORDERS API
+export function normalizeOrder(order: any): Order {
+  if (!order) return order;
+  const shippingAddressObj =
+    typeof order.shippingAddress === 'object' && order.shippingAddress !== null
+      ? order.shippingAddress
+      : {
+          address: typeof order.shippingAddress === 'string' ? order.shippingAddress : (order.address || ''),
+          city: order.city || '',
+          state: order.state || '',
+          postalCode: order.postalCode || '',
+          country: order.country || 'India',
+        };
+
+  const items = (order.items || []).map((item: any) => {
+    const rawImg = item.imageUrl || item.image;
+    let resolvedImg = rawImg;
+    if (!resolvedImg) {
+      resolvedImg = item.productId ? `/images/${item.productId}.jpg` : '/images/hero-campaign.jpg';
+    }
+    return {
+      ...item,
+      id: item.id || `oi-${item.productId}`,
+      image: resolvedImg,
+      imageUrl: resolvedImg,
+    };
+  });
+
+  return {
+    ...order,
+    id: order.id ? String(order.id) : (order.orderNumber || `ORD-${Date.now()}`),
+    shippingAddress: shippingAddressObj,
+    items,
+  };
+}
+
 export async function getUserOrdersApi(): Promise<Order[]> {
-  return request<Order[]>('/account/orders');
+  const data = await request<Order[]>('/account/orders');
+  return Array.isArray(data) ? data.map(normalizeOrder) : [];
 }
 
 export async function getOrderDetailsApi(id: string | number): Promise<Order> {
-  return request<Order>(`/account/orders/${id}`);
+  const data = await request<Order>(`/account/orders/${id}`);
+  return normalizeOrder(data);
+}
+
+export async function createOrderApi(payload: any): Promise<Order> {
+  const data = await request<Order>('/account/orders', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return normalizeOrder(data);
 }
 
 export async function requestOrderReturnApi(
   id: string | number,
   payload: { reason: string; comment?: string }
 ): Promise<Order> {
-  return request<Order>(`/account/orders/${id}/return`, {
+  const data = await request<Order>(`/account/orders/${id}/return`, {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+  return normalizeOrder(data);
 }
 
 // REVIEWS API
@@ -302,15 +354,107 @@ export async function validateAndMergeCartApi(
 
 // PUBLIC ORDER TRACKING API
 export async function trackPublicOrderApi(trackingNumber: string): Promise<Order> {
-  return request<Order>(`/orders/track/${encodeURIComponent(trackingNumber)}`);
+  const data = await request<Order>(`/orders/track/${encodeURIComponent(trackingNumber)}`);
+  return normalizeOrder(data);
 }
 
-// ADMIN CUSTOMERS API
-export async function getAdminCustomersApi(page = 0, size = 20, search?: string) {
+// ADMIN APIS
+export async function getAdminCustomersApi(page = 0, size = 50, search?: string) {
   const query = new URLSearchParams({
     page: String(page),
     size: String(size),
     ...(search ? { search } : {}),
   });
   return request<any>(`/admin/customers?${query.toString()}`);
+}
+
+export async function getAdminCustomerDetailsApi(id: number | string) {
+  return request<any>(`/admin/customers/${id}`);
+}
+
+export async function getAllOrdersAdminApi(): Promise<Order[]> {
+  const data = await request<Order[]>('/admin/orders');
+  return Array.isArray(data) ? data.map(normalizeOrder) : [];
+}
+
+export async function updateOrderStatusAdminApi(orderId: number | string, status: string): Promise<Order> {
+  const data = await request<Order>(`/admin/orders/${orderId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+  return normalizeOrder(data);
+}
+
+export async function updateOrderReturnStatusAdminApi(orderId: number | string, returnStatus: string): Promise<Order> {
+  const data = await request<Order>(`/admin/orders/${orderId}/return-status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ returnStatus }),
+  });
+  return normalizeOrder(data);
+}
+
+export async function approveOrderReturnAdminApi(orderId: number | string): Promise<Order> {
+  const data = await request<Order>(`/admin/orders/${orderId}/return/approve`, {
+    method: 'POST',
+  });
+  return normalizeOrder(data);
+}
+
+export async function rejectOrderReturnAdminApi(orderId: number | string, reason?: string): Promise<Order> {
+  const data = await request<Order>(`/admin/orders/${orderId}/return/reject`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+  return normalizeOrder(data);
+}
+
+export async function getAdminCouponsApi(): Promise<any[]> {
+  return request<any[]>('/admin/coupons');
+}
+
+export async function createAdminCouponApi(payload: any): Promise<any> {
+  return request<any>('/admin/coupons', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function toggleAdminCouponStatusApi(id: number | string, status?: string): Promise<any> {
+  return request<any>(`/admin/coupons/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify(status ? { status } : {}),
+  });
+}
+
+export async function deleteAdminCouponApi(id: number | string): Promise<any> {
+  return request<any>(`/admin/coupons/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function createAdminProductApi(payload: any): Promise<any> {
+  return request<any>('/admin/products', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateAdminProductApi(id: number | string, payload: any): Promise<any> {
+  return request<any>(`/admin/products/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteAdminProductApi(id: number | string): Promise<any> {
+  return request<any>(`/admin/products/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function updateAdminInventoryApi(id: number | string, size: string, stock: number): Promise<any> {
+  return request<any>(`/admin/products/${id}/inventory`, {
+    method: 'PATCH',
+    body: JSON.stringify({ size, stock }),
+  });
 }

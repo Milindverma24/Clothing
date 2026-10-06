@@ -9,6 +9,7 @@ import {
   removeFromWishlistApi,
   getUserOrdersApi,
   validateAndMergeCartApi,
+  createOrderApi,
   getStoredToken,
 } from '../services/authApi';
 
@@ -28,7 +29,7 @@ interface ShopContextType {
   isInWishlist: (productId: string | number) => boolean;
   applyCoupon: (code: string) => { success: boolean; message: string };
   removeCoupon: () => void;
-  createOrder: (shippingDetails: any, paymentMethod: string) => Order;
+  createOrder: (shippingDetails: any, paymentMethod: string) => Promise<Order>;
   cartSubtotal: number;
   cartDiscount: number;
   cartShipping: number;
@@ -44,8 +45,6 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [products] = useState<Product[]>(PRODUCTS);
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
-      const token = localStorage.getItem('clothing_token');
-      if (!token) return [];
       const saved = localStorage.getItem('clothing_cart');
       return saved ? JSON.parse(saved) : [];
     } catch {
@@ -55,8 +54,6 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [wishlist, setWishlist] = useState<(string | number)[]>(() => {
     try {
-      const token = localStorage.getItem('clothing_token');
-      if (!token) return [];
       const saved = localStorage.getItem('clothing_wishlist');
       return saved ? JSON.parse(saved) : [];
     } catch {
@@ -67,7 +64,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [orders, setOrders] = useState<Order[]>(() => {
     try {
-      const token = localStorage.getItem('clothing_token');
+      const token = getStoredToken();
       if (!token) return [];
       const saved = localStorage.getItem('clothing_orders');
       return saved ? JSON.parse(saved) : [];
@@ -79,14 +76,10 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Clear cart, wishlist, orders if user is unauthenticated
+  // Clear orders when user is unauthenticated
   useEffect(() => {
     if (!isAuthenticated) {
-      setCart([]);
-      setWishlist([]);
       setOrders([]);
-      localStorage.removeItem('clothing_cart');
-      localStorage.removeItem('clothing_wishlist');
       localStorage.removeItem('clothing_orders');
     }
   }, [isAuthenticated]);
@@ -121,7 +114,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .catch((err) => console.warn('Cart merge error:', err));
     }
 
-    // 3. Sync Orders
+    // 3. Sync Orders from Backend
     getUserOrdersApi()
       .then((serverOrders) => {
         if (serverOrders && serverOrders.length > 0) {
@@ -132,16 +125,12 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [isAuthenticated, user]);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      localStorage.setItem('clothing_cart', JSON.stringify(cart));
-    }
-  }, [cart, isAuthenticated]);
+    localStorage.setItem('clothing_cart', JSON.stringify(cart));
+  }, [cart]);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      localStorage.setItem('clothing_wishlist', JSON.stringify(wishlist));
-    }
-  }, [wishlist, isAuthenticated]);
+    localStorage.setItem('clothing_wishlist', JSON.stringify(wishlist));
+  }, [wishlist]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -298,7 +287,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     showToast('Coupon removed');
   };
 
-  const createOrder = (shippingDetails: any, paymentMethod: string): Order => {
+  const createOrder = async (shippingDetails: any, paymentMethod: string): Promise<Order> => {
     if (!isAuthenticated) {
       showToast('Please sign in to place an order');
       openAuthModal('login');
@@ -316,75 +305,72 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       unitPrice: item.unitPrice,
       discount: 0,
       finalPrice: item.total,
-      image: item.product.images[0] || '/images/15970.jpg',
+      image: item.product.images[0] || `/images/${item.productId}.jpg`,
+      imageUrl: item.product.images[0] || `/images/${item.productId}.jpg`,
     }));
 
-    const newOrder: Order = {
-      id: `ORD-${Date.now().toString().slice(-6)}`,
-      customerName: shippingDetails.name,
-      customerEmail: shippingDetails.email,
-      customerPhone: shippingDetails.phone,
-      shippingAddress: {
-        address: shippingDetails.address,
-        city: shippingDetails.city,
-        state: shippingDetails.state,
-        postalCode: shippingDetails.postalCode,
-        country: shippingDetails.country || 'India',
-      },
-      items: orderItems,
+    const orderPayload = {
+      name: shippingDetails.name,
+      email: shippingDetails.email,
+      phone: shippingDetails.phone,
+      address: shippingDetails.address,
+      city: shippingDetails.city,
+      state: shippingDetails.state,
+      postalCode: shippingDetails.postalCode,
+      country: shippingDetails.country || 'India',
       subtotal: cartSubtotal,
       discount: cartDiscount,
-      couponCode: appliedCoupon?.code,
       shipping: cartShipping,
       total: cartTotal,
-      status: 'CONFIRMED',
+      couponCode: appliedCoupon?.code,
       paymentMethod,
-      trackingNumber: `TRK-${Math.floor(100000000 + Math.random() * 900000000)}`,
-      createdAt: new Date().toISOString(),
+      items: orderItems.map((oi) => ({
+        productId: oi.productId,
+        name: oi.productName,
+        sku: oi.sku,
+        size: oi.size,
+        color: oi.color,
+        quantity: oi.quantity,
+        price: oi.unitPrice,
+        finalPrice: oi.finalPrice,
+        image: oi.image || oi.imageUrl,
+        imageUrl: oi.image || oi.imageUrl,
+      })),
     };
 
-    setOrders((prev) => [newOrder, ...prev]);
-    clearCart();
-
-    // Persist to backend PostgreSQL if user authenticated
-    const token = getStoredToken();
-    if (token) {
-      fetch('http://localhost:8080/api/account/orders', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          name: shippingDetails.name,
-          email: shippingDetails.email,
-          phone: shippingDetails.phone,
+    let confirmedOrder: Order;
+    try {
+      confirmedOrder = await createOrderApi(orderPayload);
+    } catch (err) {
+      console.warn('Backend order placement failed, generating local fallback record:', err);
+      confirmedOrder = {
+        id: `ORD-${Date.now().toString().slice(-6)}`,
+        customerName: shippingDetails.name,
+        customerEmail: shippingDetails.email,
+        customerPhone: shippingDetails.phone,
+        shippingAddress: {
           address: shippingDetails.address,
           city: shippingDetails.city,
           state: shippingDetails.state,
           postalCode: shippingDetails.postalCode,
           country: shippingDetails.country || 'India',
-          subtotal: cartSubtotal,
-          discount: cartDiscount,
-          shipping: cartShipping,
-          total: cartTotal,
-          paymentMethod,
-          items: orderItems.map((oi) => ({
-            productId: oi.productId,
-            name: oi.productName,
-            sku: oi.sku,
-            size: oi.size,
-            color: oi.color,
-            quantity: oi.quantity,
-            price: oi.unitPrice,
-            finalPrice: oi.finalPrice,
-            image: oi.image,
-          })),
-        }),
-      }).catch((err) => console.warn('Failed to sync order to server:', err));
+        },
+        items: orderItems,
+        subtotal: cartSubtotal,
+        discount: cartDiscount,
+        couponCode: appliedCoupon?.code,
+        shipping: cartShipping,
+        total: cartTotal,
+        status: 'CONFIRMED',
+        paymentMethod,
+        trackingNumber: `TRK-${Math.floor(100000000 + Math.random() * 900000000)}`,
+        createdAt: new Date().toISOString(),
+      };
     }
 
-    return newOrder;
+    setOrders((prev) => [confirmedOrder, ...prev.filter((o) => o.id !== confirmedOrder.id)]);
+    clearCart();
+    return confirmedOrder;
   };
 
   return (

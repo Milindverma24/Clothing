@@ -17,6 +17,8 @@ public interface AiConversationRepository extends JpaRepository<AiConversation, 
 
     Optional<AiConversation> findBySessionId(String sessionId);
 
+    List<AiConversation> findByUserIdOrderByLastActivityAtDesc(Long userId);
+
     Page<AiConversation> findByStatusOrderByLastActivityAtDesc(String status, Pageable pageable);
 
     Page<AiConversation> findByHasUnansweredTrueOrderByLastActivityAtDesc(Pageable pageable);

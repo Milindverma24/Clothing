@@ -1,0 +1,33 @@
+# Environments & Dependencies
+.venv/
+venv/
+ENV/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment Variables & Secrets
+.env
+.env.*
+!.env.example
+
+# Database & Storage
+*.sqlite3
+*.db
+data/
+uploads/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs
+logs/
+*.log
+
+# OS & Editor
+.DS_Store
+.vscode/
+.idea/

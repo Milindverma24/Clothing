@@ -124,7 +124,7 @@ export const CheckoutPage: React.FC = () => {
     );
   }
 
-  const handleSubmitOrder = (e: React.FormEvent) => {
+  const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isAuthenticated) {
       openAuthModal('login');
@@ -132,21 +132,24 @@ export const CheckoutPage: React.FC = () => {
     }
     setIsSubmitting(true);
 
-    setTimeout(() => {
-      try {
-        const order = createOrder(formData, paymentMethod.toUpperCase());
-        setPlacedOrder(order);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      } catch (err) {
-        console.error('Failed to create order:', err);
-      } finally {
-        setIsSubmitting(false);
-      }
-    }, 800);
+    try {
+      const order = await createOrder(formData, paymentMethod.toUpperCase());
+      setPlacedOrder(order);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err) {
+      console.error('Failed to create order:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Order Confirmed View
   if (placedOrder) {
+    const formattedAddress =
+      typeof placedOrder.shippingAddress === 'string'
+        ? placedOrder.shippingAddress
+        : `${placedOrder.shippingAddress?.address || ''}, ${placedOrder.shippingAddress?.city || ''}, ${placedOrder.shippingAddress?.postalCode || ''}`;
+
     return (
       <div className="max-w-2xl mx-auto px-4 py-16 text-center">
         <div className="w-16 h-16 bg-[#e8f5ee] text-[#167a45] rounded-full flex items-center justify-center mx-auto mb-6">
@@ -170,7 +173,7 @@ export const CheckoutPage: React.FC = () => {
           <div className="flex justify-between pb-3 border-b border-[#e5e5e5] text-xs">
             <span className="text-[#8a8a8a]">Delivery Address</span>
             <span className="font-medium text-black text-right max-w-xs">
-              {placedOrder.shippingAddress.address}, {placedOrder.shippingAddress.city}, {placedOrder.shippingAddress.postalCode}
+              {formattedAddress}
             </span>
           </div>
           <div className="flex justify-between text-sm font-bold text-black pt-1">

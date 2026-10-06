@@ -73,6 +73,10 @@ public class Product {
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProductImage> images = new ArrayList<>();
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "size_chart_id")
+    private SizeChart sizeChart;
+
     @PrePersist
     @PreUpdate
     public void prepareSearchableContent() {
@@ -158,4 +162,7 @@ public class Product {
 
     public List<ProductImage> getImages() { return images; }
     public void setImages(List<ProductImage> images) { this.images = images; }
+
+    public SizeChart getSizeChart() { return sizeChart; }
+    public void setSizeChart(SizeChart sizeChart) { this.sizeChart = sizeChart; }
 }

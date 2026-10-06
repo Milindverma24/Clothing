@@ -749,6 +749,21 @@ export const AccountPage: React.FC = () => {
                             <span className="px-2.5 py-0.5 bg-[#e8f5ee] text-[#167a45] rounded-full text-[10px] font-bold uppercase tracking-wider">
                               {ord.status}
                             </span>
+                            {ord.returnStatus && ord.returnStatus !== 'NONE' && (
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                ord.returnStatus === 'AWAITING_APPROVAL'
+                                  ? 'bg-amber-100 text-amber-900 border border-amber-300 font-extrabold animate-pulse'
+                                  : ord.returnStatus === 'REQUESTED'
+                                  ? 'bg-[#fff7ed] text-[#c2410c] border border-[#ffedd5]'
+                                  : ord.returnStatus === 'APPROVED'
+                                  ? 'bg-[#eff6ff] text-[#1d4ed8] border border-[#dbeafe]'
+                                  : ord.returnStatus === 'REFUNDED'
+                                  ? 'bg-[#f0fdf4] text-[#15803d] border border-[#bbf7d0]'
+                                  : 'bg-[#fef2f2] text-[#b91c1c] border border-[#fecaca]'
+                              }`}>
+                                {ord.returnStatus === 'AWAITING_APPROVAL' ? '⚠️ Under Atelier Review' : ord.returnStatus === 'APPROVED' ? '✓ Return Approved' : `Return: ${ord.returnStatus}`}
+                              </span>
+                            )}
                           </div>
                           <span className="text-[11px] text-[#8a8a8a] flex items-center gap-1 mt-1">
                             <Clock className="w-3 h-3" />
@@ -778,8 +793,16 @@ export const AccountPage: React.FC = () => {
                         {ord.items.map((item) => (
                           <div key={item.id} className="flex items-center gap-4">
                             <img
-                              src={item.image}
+                              src={item.image || item.imageUrl || (item.productId ? `/images/${item.productId}.jpg` : '/images/15970.jpg')}
                               alt={item.productName}
+                              onError={(e) => {
+                                const target = e.currentTarget;
+                                if (item.productId && !target.src.includes(`/images/${item.productId}.jpg`)) {
+                                  target.src = `/images/${item.productId}.jpg`;
+                                } else if (!target.src.includes('/images/15970.jpg')) {
+                                  target.src = '/images/15970.jpg';
+                                }
+                              }}
                               className="w-14 aspect-[4/5] object-cover rounded-xl bg-[#f4f4f4]"
                             />
                             <div className="flex-1 min-w-0">
@@ -820,13 +843,27 @@ export const AccountPage: React.FC = () => {
                               Write Review
                             </button>
                           )}
-                          {['DELIVERED', 'SHIPPED', 'CONFIRMED'].includes(ord.status) && (
-                            <button
-                              onClick={() => setOrderReturnModal(ord)}
-                              className="text-xs font-bold text-[#b91c1c] hover:underline"
-                            >
-                              Request Return
-                            </button>
+                          {ord.returnStatus && ord.returnStatus !== 'NONE' ? (
+                            <span className={`text-xs font-bold px-3 py-1 rounded-full ${
+                              ord.returnStatus === 'AWAITING_APPROVAL'
+                                ? 'bg-amber-100 text-amber-900 border border-amber-300 font-extrabold animate-pulse'
+                                : ord.returnStatus === 'REFUNDED'
+                                ? 'bg-[#f0fdf4] text-[#15803d]'
+                                : ord.returnStatus === 'APPROVED'
+                                ? 'bg-[#eff6ff] text-[#1d4ed8]'
+                                : 'bg-[#fff7ed] text-[#c2410c]'
+                            }`}>
+                              {ord.returnStatus === 'AWAITING_APPROVAL' ? '⚠️ Under Review' : ord.returnStatus === 'APPROVED' ? '✓ Return Approved' : `● Return ${ord.returnStatus}`}
+                            </span>
+                          ) : (
+                            ['DELIVERED', 'SHIPPED', 'CONFIRMED'].includes(ord.status) && (
+                              <button
+                                onClick={() => setOrderReturnModal(ord)}
+                                className="text-xs font-bold text-[#b91c1c] hover:underline"
+                              >
+                                Request Return
+                              </button>
+                            )
                           )}
                         </div>
                       </div>
@@ -1587,10 +1624,15 @@ export const AccountPage: React.FC = () => {
                   Shipping Destination
                 </span>
                 <p className="font-semibold text-black">{selectedOrder.customerName}</p>
-                <p className="text-[#5e5e5e]">{selectedOrder.shippingAddress.address}</p>
                 <p className="text-[#5e5e5e]">
-                  {selectedOrder.shippingAddress.city}, {selectedOrder.shippingAddress.state} -{' '}
-                  {selectedOrder.shippingAddress.postalCode}
+                  {typeof selectedOrder.shippingAddress === 'string'
+                    ? selectedOrder.shippingAddress
+                    : `${selectedOrder.shippingAddress?.address || ''}`}
+                </p>
+                <p className="text-[#5e5e5e]">
+                  {typeof selectedOrder.shippingAddress === 'string'
+                    ? `${selectedOrder.city || ''}, ${selectedOrder.state || ''} ${selectedOrder.postalCode ? '- ' + selectedOrder.postalCode : ''}`
+                    : `${selectedOrder.shippingAddress?.city || selectedOrder.city || ''}, ${selectedOrder.shippingAddress?.state || selectedOrder.state || ''} - ${selectedOrder.shippingAddress?.postalCode || selectedOrder.postalCode || ''}`}
                 </p>
               </div>
               <div>
@@ -1605,6 +1647,83 @@ export const AccountPage: React.FC = () => {
               </div>
             </div>
 
+            {/* Return & Refund Tracker Card */}
+            {selectedOrder.returnStatus && selectedOrder.returnStatus !== 'NONE' && (
+              <div className={`mb-6 p-4 rounded-2xl border space-y-2.5 ${
+                selectedOrder.returnStatus === 'AWAITING_APPROVAL'
+                  ? 'bg-amber-50/70 border-amber-300'
+                  : 'bg-[#fffbf5] border-[#fed7aa]'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <span className={`text-[10px] font-bold uppercase tracking-widest ${
+                    selectedOrder.returnStatus === 'AWAITING_APPROVAL' ? 'text-amber-900 font-extrabold' : 'text-[#c2410c]'
+                  }`}>
+                    Return & Refund Tracker
+                  </span>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                    selectedOrder.returnStatus === 'AWAITING_APPROVAL'
+                      ? 'bg-amber-200 text-amber-900 font-extrabold'
+                      : selectedOrder.returnStatus === 'REQUESTED'
+                      ? 'bg-[#ffedd5] text-[#9a3412]'
+                      : selectedOrder.returnStatus === 'APPROVED'
+                      ? 'bg-[#dbeafe] text-[#1e40af]'
+                      : selectedOrder.returnStatus === 'REFUNDED'
+                      ? 'bg-[#dcfce7] text-[#166534]'
+                      : 'bg-[#fee2e2] text-[#991b1b]'
+                  }`}>
+                    {selectedOrder.returnStatus === 'AWAITING_APPROVAL' ? 'Under Atelier Review' : selectedOrder.returnStatus}
+                  </span>
+                </div>
+
+                {/* Refund & Logistics Breakdown */}
+                <div className="grid grid-cols-2 gap-2 text-xs bg-white/80 p-3 rounded-xl border border-black/5">
+                  {selectedOrder.refundAmount && (
+                    <div>
+                      <span className="text-[#8a8a8a] text-[10px] uppercase block">Refund Amount:</span>
+                      <span className="font-bold text-black">₹{Number(selectedOrder.refundAmount).toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
+                  {selectedOrder.refundUpiId && (
+                    <div>
+                      <span className="text-[#8a8a8a] text-[10px] uppercase block">Payout UPI:</span>
+                      <span className="font-mono text-black">{selectedOrder.refundUpiId}</span>
+                    </div>
+                  )}
+                  {selectedOrder.returnTrackingNumber && (
+                    <div>
+                      <span className="text-[#8a8a8a] text-[10px] uppercase block">Return Tracking:</span>
+                      <span className="font-mono text-black">{selectedOrder.returnTrackingNumber}</span>
+                    </div>
+                  )}
+                  {selectedOrder.refundReference && (
+                    <div>
+                      <span className="text-[#8a8a8a] text-[10px] uppercase block">Refund Reference:</span>
+                      <span className="font-mono text-black">{selectedOrder.refundReference}</span>
+                    </div>
+                  )}
+                </div>
+
+                {selectedOrder.returnReason && (
+                  <p className="text-xs text-black font-semibold">
+                    Return Reason: <span className="font-normal text-[#5e5e5e]">{selectedOrder.returnReason}</span>
+                  </p>
+                )}
+                {selectedOrder.returnComment && (
+                  <p className="text-xs text-black font-semibold">
+                    Customer Note: <span className="font-normal text-[#5e5e5e]">{selectedOrder.returnComment}</span>
+                  </p>
+                )}
+                <p className="text-[11px] text-[#5e5e5e] pt-1.5 border-t border-black/5">
+                  {selectedOrder.returnStatus === 'AWAITING_APPROVAL' && '⏳ Your high-value return request (> ₹5,000) has been received and routed to our supervisor team for authorization. You will be notified within 24 hours.'}
+                  {selectedOrder.returnStatus === 'REQUESTED' && 'Your return request has been submitted and is currently being reviewed by our atelier logistics team. Pickup will be assigned shortly.'}
+                  {selectedOrder.returnStatus === 'APPROVED' && '✅ Return request approved! A carrier partner (Delhivery / BlueDart) will pick up the package within 48 hours. Keep items in original packaging.'}
+                  {selectedOrder.returnStatus === 'RETURNED' && 'Piece received at our fulfillment center and verified by quality control.'}
+                  {selectedOrder.returnStatus === 'REFUNDED' && 'Refund has been successfully processed to your specified payment destination.'}
+                  {selectedOrder.returnStatus === 'REJECTED' && 'This return request could not be accepted under our return policy guidelines.'}
+                </p>
+              </div>
+            )}
+
             {/* Item Breakdown */}
             <div className="space-y-3 mb-6">
               <span className="text-[10px] font-bold uppercase tracking-widest text-[#8a8a8a] block">
@@ -1613,7 +1732,19 @@ export const AccountPage: React.FC = () => {
               {selectedOrder.items.map((item) => (
                 <div key={item.id} className="flex items-center justify-between text-xs py-2 border-b border-[#f4f4f4]">
                   <div className="flex items-center gap-3">
-                    <img src={item.image} alt={item.productName} className="w-12 h-14 object-cover rounded-lg bg-[#f4f4f4]" />
+                    <img
+                      src={item.image || item.imageUrl || (item.productId ? `/images/${item.productId}.jpg` : '/images/15970.jpg')}
+                      alt={item.productName}
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        if (item.productId && !target.src.includes(`/images/${item.productId}.jpg`)) {
+                          target.src = `/images/${item.productId}.jpg`;
+                        } else if (!target.src.includes('/images/15970.jpg')) {
+                          target.src = '/images/15970.jpg';
+                        }
+                      }}
+                      className="w-12 h-14 object-cover rounded-lg bg-[#f4f4f4]"
+                    />
                     <div>
                       <p className="font-semibold text-black">{item.productName}</p>
                       <p className="text-[11px] text-[#8a8a8a]">

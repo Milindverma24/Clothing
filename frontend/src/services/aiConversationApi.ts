@@ -1,4 +1,15 @@
+import { getStoredToken } from './authApi';
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+
+function getAdminHeaders(extraHeaders: Record<string, string> = {}): HeadersInit {
+  const token = getStoredToken();
+  const headers: Record<string, string> = { ...extraHeaders };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
 
 export interface AiSourceItem {
   id: number;
@@ -120,21 +131,27 @@ export async function getAiConversationsApi(params: {
   query.append('page', (params.page ?? 0).toString());
   query.append('size', (params.size ?? 20).toString());
 
-  const res = await fetch(`${API_BASE_URL}/admin/ai-conversations?${query.toString()}`);
+  const res = await fetch(`${API_BASE_URL}/admin/ai-conversations?${query.toString()}`, {
+    headers: getAdminHeaders(),
+  });
   if (!res.ok) throw new Error('Failed to fetch AI conversations');
   const json = await res.json();
   return json.data;
 }
 
 export async function getAiConversationDetailApi(id: number): Promise<AiConversationDetail> {
-  const res = await fetch(`${API_BASE_URL}/admin/ai-conversations/${id}`);
+  const res = await fetch(`${API_BASE_URL}/admin/ai-conversations/${id}`, {
+    headers: getAdminHeaders(),
+  });
   if (!res.ok) throw new Error('Failed to fetch conversation details');
   const json = await res.json();
   return json.data;
 }
 
 export async function getAiConversationStatsApi(): Promise<AiConversationStats> {
-  const res = await fetch(`${API_BASE_URL}/admin/ai-conversations/stats`);
+  const res = await fetch(`${API_BASE_URL}/admin/ai-conversations/stats`, {
+    headers: getAdminHeaders(),
+  });
   if (!res.ok) throw new Error('Failed to fetch AI conversation statistics');
   const json = await res.json();
   return json.data;
@@ -145,7 +162,9 @@ export async function getUnansweredQuestionsApi(page = 0, size = 20): Promise<{
   totalPages: number;
   totalElements: number;
 }> {
-  const res = await fetch(`${API_BASE_URL}/admin/ai-conversations/unanswered?page=${page}&size=${size}`);
+  const res = await fetch(`${API_BASE_URL}/admin/ai-conversations/unanswered?page=${page}&size=${size}`, {
+    headers: getAdminHeaders(),
+  });
   if (!res.ok) throw new Error('Failed to fetch unanswered questions');
   const json = await res.json();
   return json.data;
@@ -154,6 +173,7 @@ export async function getUnansweredQuestionsApi(page = 0, size = 20): Promise<{
 export async function updateConversationStatusApi(id: number, status: string): Promise<void> {
   const res = await fetch(`${API_BASE_URL}/admin/ai-conversations/${id}/status?status=${status}`, {
     method: 'PATCH',
+    headers: getAdminHeaders(),
   });
   if (!res.ok) throw new Error('Failed to update conversation status');
 }
@@ -178,7 +198,7 @@ export async function sendAdminReplyApi(
 ): Promise<AiMessageItem> {
   const res = await fetch(`${API_BASE_URL}/admin/ai-conversations/${conversationId}/reply`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAdminHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ message, adminName }),
   });
   if (!res.ok) throw new Error('Failed to send admin reply');

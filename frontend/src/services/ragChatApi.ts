@@ -82,11 +82,22 @@ export async function sendChatMessageApi(
   return json.data;
 }
 
+function getAdminHeaders(): Record<string, string> {
+  const token = localStorage.getItem('clothing_auth_token') || localStorage.getItem('clothing_token');
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
 /**
  * Admin: List all knowledge base documents
  */
 export async function getKnowledgeDocumentsApi(): Promise<KnowledgeDocumentSummary[]> {
-  const res = await fetch(`${API_BASE}/admin/knowledge-base/documents`);
+  const res = await fetch(`${API_BASE}/admin/knowledge-base/documents`, {
+    headers: getAdminHeaders(),
+  });
   if (!res.ok) {
     throw new Error(`Failed to fetch documents: ${res.statusText}`);
   }
@@ -103,6 +114,7 @@ export async function uploadKnowledgeDocumentApi(file: File): Promise<KnowledgeD
 
   const res = await fetch(`${API_BASE}/admin/knowledge-base/documents`, {
     method: 'POST',
+    headers: getAdminHeaders(),
     body: formData,
   });
 
@@ -119,8 +131,10 @@ export async function uploadKnowledgeDocumentApi(file: File): Promise<KnowledgeD
  * Admin: Re-index an existing document
  */
 export async function reindexKnowledgeDocumentApi(id: number): Promise<KnowledgeDocumentSummary> {
+  const headers = { ...getAdminHeaders(), 'Content-Type': 'application/json' };
   const res = await fetch(`${API_BASE}/admin/knowledge-base/documents/${id}/reindex`, {
     method: 'POST',
+    headers,
   });
 
   if (!res.ok) {
@@ -137,6 +151,7 @@ export async function reindexKnowledgeDocumentApi(id: number): Promise<Knowledge
 export async function deleteKnowledgeDocumentApi(id: number): Promise<void> {
   const res = await fetch(`${API_BASE}/admin/knowledge-base/documents/${id}`, {
     method: 'DELETE',
+    headers: getAdminHeaders(),
   });
 
   if (!res.ok) {

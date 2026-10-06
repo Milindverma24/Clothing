@@ -2317,4 +2317,23 @@ When developing, modifying, or extending customer accounts, profiles, authentica
     - Passwords must be salted and hashed with BCrypt. Plaintext passwords must NEVER be saved, logged, or exposed in API responses.
     - Password recovery (`/api/auth/forgot-password`) must use generic responses ("If an account exists for this email, a reset link has been sent") to prevent account enumeration.
 
+⸻
+
+## 81. Order Item Snapshotting & Image Integrity Standards
+
+When creating an order:
+1. **Never rely solely on live catalog product references for historical order display.**
+2. Snapshot the following immutable fields onto the `order_items` record:
+   - `productId` (original catalog reference)
+   - `productName` (product title at checkout)
+   - `imageUrl` / `image` (verified visual asset snapshot)
+   - `sku` (variant identifier)
+   - `size` & `color`
+   - `quantity`
+   - `unitPrice` & `finalPrice`
+3. **Dual Serialization**: In `OrderItem.java`, provide Jackson annotations (`@JsonProperty("image")` and `@JsonProperty("imageUrl")`) so both property conventions are guaranteed in API responses.
+4. **Resilient Frontend Fallbacks**: All customer order components must provide multi-level image fallback (`item.image || item.imageUrl || '/images/' + item.productId + '.jpg'`) with dynamic `onError` event handling to prevent missing or broken image placeholders under any catalog transition.
+5. **Strict Admin Security**: Admin routes (`/api/admin/**`) must always require `hasRole("ADMIN")` in Spring Security. Never use `.permitAll()` on admin management endpoints.
+
+
 

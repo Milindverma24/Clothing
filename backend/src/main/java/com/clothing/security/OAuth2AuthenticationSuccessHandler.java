@@ -112,7 +112,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         String token = tokenProvider.generateToken(user);
 
         // Redirect back to frontend
-        String targetUrl = redirectUrl + "?oauth_token=" + token;
+        String targetUrl = redirectUrl + "?token=" + token + "&oauth_token=" + token;
         getRedirectStrategy().sendRedirect(request, response, targetUrl);
     }
 }

@@ -41,6 +41,8 @@ public class DataLoader implements CommandLineRunner {
     private final UserRepository userRepository;
     private final AddressRepository addressRepository;
     private final OrderRepository orderRepository;
+    private final CouponRepository couponRepository;
+    private final SizeChartRepository sizeChartRepository;
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     public DataLoader(
@@ -55,6 +57,8 @@ public class DataLoader implements CommandLineRunner {
             UserRepository userRepository,
             AddressRepository addressRepository,
             OrderRepository orderRepository,
+            CouponRepository couponRepository,
+            SizeChartRepository sizeChartRepository,
             org.springframework.security.crypto.password.PasswordEncoder passwordEncoder) {
         this.productRepository = productRepository;
         this.knowledgeDocumentRepository = knowledgeDocumentRepository;
@@ -67,12 +71,16 @@ public class DataLoader implements CommandLineRunner {
         this.userRepository = userRepository;
         this.addressRepository = addressRepository;
         this.orderRepository = orderRepository;
+        this.couponRepository = couponRepository;
+        this.sizeChartRepository = sizeChartRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
     @Override
     public void run(String... args) throws Exception {
         seedDefaultUsers();
+        seedDefaultCoupons();
+        seedSizeCharts();
         seedProducts();
         seedStarterKnowledgeBase();
         seedSampleConversations();
@@ -165,12 +173,59 @@ public class DataLoader implements CommandLineRunner {
         item1.setUnitPrice(new BigDecimal("2999"));
         item1.setDiscount(new BigDecimal("300"));
         item1.setFinalPrice(new BigDecimal("2699"));
-        item1.setImageUrl("/images/hero-campaign.jpg");
+        item1.setImageUrl("/images/15970.jpg");
         sampleOrder.getItems().add(item1);
 
         orderRepository.save(sampleOrder);
 
         log.info("Default accounts seeded: admin@clothing.com / admin123, milind@example.com / password123");
+    }
+
+    private void seedDefaultCoupons() {
+        if (couponRepository.count() > 0) {
+            return;
+        }
+
+        log.info("Seeding default promotional coupons...");
+
+        Coupon c1 = new Coupon();
+        c1.setCode("WELCOME10");
+        c1.setDiscountType("PERCENTAGE");
+        c1.setDiscountValue(new BigDecimal("10"));
+        c1.setMinimumCartValue(new BigDecimal("999"));
+        c1.setMaximumDiscount(new BigDecimal("1000"));
+        c1.setStatus("ACTIVE");
+        c1.setUsedCount(0);
+        couponRepository.save(c1);
+
+        Coupon c2 = new Coupon();
+        c2.setCode("SAVE500");
+        c2.setDiscountType("FIXED_AMOUNT");
+        c2.setDiscountValue(new BigDecimal("500"));
+        c2.setMinimumCartValue(new BigDecimal("2499"));
+        c2.setStatus("ACTIVE");
+        c2.setUsedCount(0);
+        couponRepository.save(c2);
+
+        Coupon c3 = new Coupon();
+        c3.setCode("FREESHIP");
+        c3.setDiscountType("FREE_SHIPPING");
+        c3.setDiscountValue(new BigDecimal("99"));
+        c3.setMinimumCartValue(new BigDecimal("799"));
+        c3.setStatus("ACTIVE");
+        c3.setUsedCount(0);
+        couponRepository.save(c3);
+
+        Coupon c4 = new Coupon();
+        c4.setCode("MILIND10");
+        c4.setDiscountType("FIXED_AMOUNT");
+        c4.setDiscountValue(new BigDecimal("150"));
+        c4.setMinimumCartValue(new BigDecimal("1299"));
+        c4.setStatus("ACTIVE");
+        c4.setUsedCount(0);
+        couponRepository.save(c4);
+
+        log.info("Successfully seeded 4 default promotional coupons.");
     }
 
     private void seedProducts() {
@@ -593,6 +648,196 @@ public class DataLoader implements CommandLineRunner {
 
         } catch (Exception e) {
             log.error("Error seeding sample AI conversations: ", e);
+        }
+    }
+
+    private void seedSizeCharts() {
+        if (sizeChartRepository.count() > 0) {
+            log.info("Database already contains size charts. Linking unlinked products if any...");
+            linkProductsToSizeCharts();
+            return;
+        }
+
+        log.info("Seeding comprehensive size charts for Men, Women, Boys, and Girls...");
+
+        // 1. Men's Shirts / Tops (ADULT / SHIRT)
+        SizeChart menShirt = new SizeChart("Men's Shirts & Tops Size Guide", "MEN", "ADULT", "SHIRT", "IN",
+            "Standard tailored and casual fit for men's shirts and tops.", "MEN_TOP");
+        addEntry(menShirt, "XS", 1, 34.0, 36.0, null, null, 28.0, 30.0, null, null, 16.0, 16.5, null, null, null, null);
+        addEntry(menShirt, "S", 2, 36.0, 38.0, null, null, 30.0, 32.0, null, null, 17.0, 17.5, null, null, null, null);
+        addEntry(menShirt, "M", 3, 38.0, 40.0, null, null, 32.0, 34.0, null, null, 18.0, 18.5, null, null, null, null);
+        addEntry(menShirt, "L", 4, 40.0, 42.0, null, null, 34.0, 36.0, null, null, 19.0, 19.5, null, null, null, null);
+        addEntry(menShirt, "XL", 5, 42.0, 44.0, null, null, 36.0, 38.0, null, null, 20.0, 20.5, null, null, null, null);
+        addEntry(menShirt, "XXL", 6, 44.0, 46.0, null, null, 38.0, 40.0, null, null, 21.0, 21.5, null, null, null, null);
+        sizeChartRepository.save(menShirt);
+
+        // 2. Men's T-Shirts (ADULT / TSHIRT)
+        SizeChart menTshirt = new SizeChart("Men's T-Shirts & Polos Size Guide", "MEN", "ADULT", "TSHIRT", "IN",
+            "Regular and oversized fit measurements for men's t-shirts and polo shirts.", "MEN_TOP");
+        addEntry(menTshirt, "XS", 1, 34.0, 36.0, null, null, 28.0, 30.0, null, null, 16.0, 16.5, null, null, null, null);
+        addEntry(menTshirt, "S", 2, 36.0, 38.0, null, null, 30.0, 32.0, null, null, 17.0, 17.5, null, null, null, null);
+        addEntry(menTshirt, "M", 3, 38.0, 40.0, null, null, 32.0, 34.0, null, null, 18.0, 18.5, null, null, null, null);
+        addEntry(menTshirt, "L", 4, 40.0, 42.0, null, null, 34.0, 36.0, null, null, 19.0, 19.5, null, null, null, null);
+        addEntry(menTshirt, "XL", 5, 42.0, 44.0, null, null, 36.0, 38.0, null, null, 20.0, 20.5, null, null, null, null);
+        addEntry(menTshirt, "XXL", 6, 44.0, 46.0, null, null, 38.0, 40.0, null, null, 21.0, 21.5, null, null, null, null);
+        sizeChartRepository.save(menTshirt);
+
+        // 3. Men's Trousers & Pants (ADULT / TROUSER)
+        SizeChart menTrouser = new SizeChart("Men's Trousers & Pants Size Guide", "MEN", "ADULT", "TROUSER", "IN",
+            "Waist and hip sizing for men's trousers, chinos, and formal pants.", "MEN_BOTTOM");
+        addEntry(menTrouser, "28", 1, null, null, null, null, 28.0, 29.0, 34.0, 35.0, null, null, 30.0, 30.0, null, null);
+        addEntry(menTrouser, "30", 2, null, null, null, null, 30.0, 31.0, 36.0, 37.0, null, null, 30.0, 32.0, null, null);
+        addEntry(menTrouser, "32", 3, null, null, null, null, 32.0, 33.0, 38.0, 39.0, null, null, 32.0, 32.0, null, null);
+        addEntry(menTrouser, "34", 4, null, null, null, null, 34.0, 35.0, 40.0, 41.0, null, null, 32.0, 32.0, null, null);
+        addEntry(menTrouser, "36", 5, null, null, null, null, 36.0, 37.0, 42.0, 43.0, null, null, 32.0, 34.0, null, null);
+        addEntry(menTrouser, "38", 6, null, null, null, null, 38.0, 39.0, 44.0, 45.0, null, null, 34.0, 34.0, null, null);
+        sizeChartRepository.save(menTrouser);
+
+        // 4. Men's Jeans (ADULT / JEANS)
+        SizeChart menJeans = new SizeChart("Men's Jeans Size Guide", "MEN", "ADULT", "JEANS", "IN",
+            "Denim sizing for men's slim, straight, and relaxed jeans.", "MEN_BOTTOM");
+        addEntry(menJeans, "28", 1, null, null, null, null, 28.0, 29.0, 34.0, 35.0, null, null, 30.0, 30.0, null, null);
+        addEntry(menJeans, "30", 2, null, null, null, null, 30.0, 31.0, 36.0, 37.0, null, null, 30.0, 32.0, null, null);
+        addEntry(menJeans, "32", 3, null, null, null, null, 32.0, 33.0, 38.0, 39.0, null, null, 32.0, 32.0, null, null);
+        addEntry(menJeans, "34", 4, null, null, null, null, 34.0, 35.0, 40.0, 41.0, null, null, 32.0, 32.0, null, null);
+        addEntry(menJeans, "36", 5, null, null, null, null, 36.0, 37.0, 42.0, 43.0, null, null, 32.0, 34.0, null, null);
+        addEntry(menJeans, "38", 6, null, null, null, null, 38.0, 39.0, 44.0, 45.0, null, null, 34.0, 34.0, null, null);
+        sizeChartRepository.save(menJeans);
+
+        // 5. Women's Tops & Shirts (ADULT / TOP)
+        SizeChart womenTop = new SizeChart("Women's Tops & Shirts Size Guide", "WOMEN", "ADULT", "TOP", "IN",
+            "Standard fitted and relaxed cuts for women's tops, blouses, and shirts.", "WOMEN_TOP");
+        addEntry(womenTop, "XS", 1, null, null, 31.0, 33.0, 24.0, 26.0, 34.0, 36.0, null, null, null, null, null, null);
+        addEntry(womenTop, "S", 2, null, null, 33.0, 35.0, 26.0, 28.0, 36.0, 38.0, null, null, null, null, null, null);
+        addEntry(womenTop, "M", 3, null, null, 35.0, 37.0, 28.0, 30.0, 38.0, 40.0, null, null, null, null, null, null);
+        addEntry(womenTop, "L", 4, null, null, 37.0, 39.0, 30.0, 32.0, 40.0, 42.0, null, null, null, null, null, null);
+        addEntry(womenTop, "XL", 5, null, null, 39.0, 42.0, 32.0, 35.0, 42.0, 45.0, null, null, null, null, null, null);
+        addEntry(womenTop, "XXL", 6, null, null, 42.0, 45.0, 35.0, 38.0, 45.0, 48.0, null, null, null, null, null, null);
+        sizeChartRepository.save(womenTop);
+
+        // 6. Women's Dresses (ADULT / DRESS)
+        SizeChart womenDress = new SizeChart("Women's Dresses Size Guide", "WOMEN", "ADULT", "DRESS", "IN",
+            "Sizing specifications for women's dresses and jumpsuits.", "WOMEN_TOP");
+        addEntry(womenDress, "XS", 1, null, null, 31.0, 33.0, 24.0, 26.0, 34.0, 36.0, null, null, null, null, null, null);
+        addEntry(womenDress, "S", 2, null, null, 33.0, 35.0, 26.0, 28.0, 36.0, 38.0, null, null, null, null, null, null);
+        addEntry(womenDress, "M", 3, null, null, 35.0, 37.0, 28.0, 30.0, 38.0, 40.0, null, null, null, null, null, null);
+        addEntry(womenDress, "L", 4, null, null, 37.0, 39.0, 30.0, 32.0, 40.0, 42.0, null, null, null, null, null, null);
+        addEntry(womenDress, "XL", 5, null, null, 39.0, 42.0, 32.0, 35.0, 42.0, 45.0, null, null, null, null, null, null);
+        addEntry(womenDress, "XXL", 6, null, null, 42.0, 45.0, 35.0, 38.0, 45.0, 48.0, null, null, null, null, null, null);
+        sizeChartRepository.save(womenDress);
+
+        // 7. Women's Jeans & Trousers (ADULT / JEANS)
+        SizeChart womenJeans = new SizeChart("Women's Jeans & Trousers Size Guide", "WOMEN", "ADULT", "JEANS", "IN",
+            "Waist and hip sizing for women's denim and tailored trousers.", "WOMEN_BOTTOM");
+        addEntry(womenJeans, "26", 1, null, null, null, null, 25.0, 26.0, 35.0, 36.0, null, null, 28.0, 30.0, null, null);
+        addEntry(womenJeans, "28", 2, null, null, null, null, 27.0, 28.0, 37.0, 38.0, null, null, 28.0, 30.0, null, null);
+        addEntry(womenJeans, "30", 3, null, null, null, null, 29.0, 30.0, 39.0, 40.0, null, null, 30.0, 30.0, null, null);
+        addEntry(womenJeans, "32", 4, null, null, null, null, 31.0, 32.0, 41.0, 42.0, null, null, 30.0, 30.0, null, null);
+        addEntry(womenJeans, "34", 5, null, null, null, null, 33.0, 34.0, 43.0, 44.0, null, null, 30.0, 32.0, null, null);
+        addEntry(womenJeans, "36", 6, null, null, null, null, 35.0, 36.0, 45.0, 46.0, null, null, 32.0, 32.0, null, null);
+        sizeChartRepository.save(womenJeans);
+
+        // 8. Boys' Clothing (KIDS / SHIRT) - Age groups: 2-3Y, 4-5Y, 6-7Y, 8-9Y, 10-11Y, 12-13Y, 14-15Y
+        SizeChart boysChart = new SizeChart("Boys' Clothing Size Guide", "BOYS", "KIDS", "SHIRT", "IN",
+            "Age-appropriate body measurements for boys' shirts, tees, and apparel.", "KIDS_TOP");
+        addEntry(boysChart, "2-3Y", 1, 20.0, 21.0, null, null, 19.0, 20.0, null, null, null, null, null, null, 35.0, 38.0);
+        addEntry(boysChart, "4-5Y", 2, 22.0, 23.0, null, null, 21.0, 22.0, null, null, null, null, null, null, 39.0, 44.0);
+        addEntry(boysChart, "6-7Y", 3, 24.0, 25.0, null, null, 22.0, 23.0, null, null, null, null, null, null, 45.0, 49.0);
+        addEntry(boysChart, "8-9Y", 4, 26.0, 27.0, null, null, 23.0, 24.0, null, null, null, null, null, null, 50.0, 54.0);
+        addEntry(boysChart, "10-11Y", 5, 28.0, 29.0, null, null, 25.0, 26.0, null, null, null, null, null, null, 55.0, 58.0);
+        addEntry(boysChart, "12-13Y", 6, 30.0, 32.0, null, null, 26.0, 27.0, null, null, null, null, null, null, 59.0, 62.0);
+        addEntry(boysChart, "14-15Y", 7, 33.0, 35.0, null, null, 28.0, 29.0, null, null, null, null, null, null, 63.0, 66.0);
+        sizeChartRepository.save(boysChart);
+
+        // 9. Girls' Clothing (KIDS / DRESS) - Age groups: 2-3Y, 4-5Y, 6-7Y, 8-9Y, 10-11Y, 12-13Y, 14-15Y
+        SizeChart girlsChart = new SizeChart("Girls' Clothing Size Guide", "GIRLS", "KIDS", "DRESS", "IN",
+            "Age-appropriate measurements for girls' dresses, tops, and sets.", "KIDS_TOP");
+        addEntry(girlsChart, "2-3Y", 1, null, null, 20.0, 21.0, 19.0, 20.0, 20.0, 21.0, null, null, null, null, 35.0, 38.0);
+        addEntry(girlsChart, "4-5Y", 2, null, null, 21.0, 22.5, 20.0, 21.0, 22.0, 23.0, null, null, null, null, 39.0, 44.0);
+        addEntry(girlsChart, "6-7Y", 3, null, null, 23.0, 24.5, 21.0, 22.0, 24.0, 25.0, null, null, null, null, 45.0, 49.0);
+        addEntry(girlsChart, "8-9Y", 4, null, null, 25.0, 27.0, 22.0, 23.5, 26.0, 28.0, null, null, null, null, 50.0, 54.0);
+        addEntry(girlsChart, "10-11Y", 5, null, null, 28.0, 30.0, 24.0, 25.5, 29.0, 31.0, null, null, null, null, 55.0, 58.0);
+        addEntry(girlsChart, "12-13Y", 6, null, null, 31.0, 33.0, 25.5, 27.0, 32.0, 34.0, null, null, null, null, 59.0, 62.0);
+        addEntry(girlsChart, "14-15Y", 7, null, null, 33.5, 35.5, 27.0, 28.5, 35.0, 37.0, null, null, null, null, 63.0, 66.0);
+        sizeChartRepository.save(girlsChart);
+
+        log.info("Successfully seeded 9 standard size charts.");
+        linkProductsToSizeCharts();
+    }
+
+    private void addEntry(SizeChart chart, String size, int order,
+                          Double chestMin, Double chestMax,
+                          Double bustMin, Double bustMax,
+                          Double waistMin, Double waistMax,
+                          Double hipMin, Double hipMax,
+                          Double shoulderMin, Double shoulderMax,
+                          Double inseamMin, Double inseamMax,
+                          Double heightMin, Double heightMax) {
+        SizeChartEntry entry = new SizeChartEntry();
+        entry.setSizeChart(chart);
+        entry.setSize(size);
+        entry.setSortOrder(order);
+        entry.setChestMin(chestMin);
+        entry.setChestMax(chestMax);
+        entry.setBustMin(bustMin);
+        entry.setBustMax(bustMax);
+        entry.setWaistMin(waistMin);
+        entry.setWaistMax(waistMax);
+        entry.setHipMin(hipMin);
+        entry.setHipMax(hipMax);
+        entry.setShoulderMin(shoulderMin);
+        entry.setShoulderMax(shoulderMax);
+        entry.setInseamMin(inseamMin);
+        entry.setInseamMax(inseamMax);
+        entry.setHeightMin(heightMin);
+        entry.setHeightMax(heightMax);
+        chart.getEntries().add(entry);
+    }
+
+    private void linkProductsToSizeCharts() {
+        try {
+            List<SizeChart> charts = sizeChartRepository.findAll();
+            if (charts.isEmpty()) return;
+
+            Map<String, SizeChart> chartMap = new HashMap<>();
+            for (SizeChart c : charts) {
+                String key = (c.getGender() + "_" + c.getAudience() + "_" + c.getCategory()).toUpperCase();
+                chartMap.put(key, c);
+            }
+
+            List<Product> products = productRepository.findAll();
+            int updated = 0;
+            for (Product p : products) {
+                if (p.getSizeChart() == null) {
+                    String gender = p.getGender() != null && p.getGender().toUpperCase().contains("WOMEN") ? "WOMEN" : "MEN";
+                    String cat = "SHIRT";
+                    String sub = (p.getSubCategory() != null ? p.getSubCategory() : "").toUpperCase();
+                    String art = (p.getArticleType() != null ? p.getArticleType() : "").toUpperCase();
+                    if (sub.contains("BOTTOM") || art.contains("TROUSER") || art.contains("PANT")) {
+                        cat = "TROUSER";
+                    } else if (art.contains("JEAN")) {
+                        cat = "JEANS";
+                    } else if (art.contains("DRESS")) {
+                        cat = "DRESS";
+                    } else if (gender.equals("WOMEN") && (art.contains("TOP") || sub.contains("TOP"))) {
+                        cat = "TOP";
+                    }
+                    SizeChart matched = chartMap.get((gender + "_ADULT_" + cat).toUpperCase());
+                    if (matched == null) {
+                        matched = chartMap.get((gender + "_ADULT_SHIRT").toUpperCase());
+                    }
+                    if (matched != null) {
+                        p.setSizeChart(matched);
+                        productRepository.save(p);
+                        updated++;
+                    }
+                }
+            }
+            if (updated > 0) {
+                log.info("Linked {} products to their appropriate size charts.", updated);
+            }
+        } catch (Exception e) {
+            log.warn("Could not link products to size charts: {}", e.getMessage());
         }
     }
 }

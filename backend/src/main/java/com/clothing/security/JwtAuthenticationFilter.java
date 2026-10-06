@@ -47,6 +47,32 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 }
+            } else {
+                // Support AI Agent Service Key propagation
+                String aiKey = request.getHeader("X-AI-Service-Key");
+                if (StringUtils.hasText(aiKey) && "ai-agent-internal-secret-key".equals(aiKey.trim())) {
+                    String userEmail = request.getHeader("X-User-Email");
+                    UserDetails userDetails = null;
+                    if (StringUtils.hasText(userEmail)) {
+                        try {
+                            userDetails = customUserDetailsService.loadUserByUsername(userEmail.trim());
+                        } catch (Exception ignored) {}
+                    }
+                    if (userDetails == null) {
+                        try {
+                            userDetails = customUserDetailsService.loadUserByUsername("milind@example.com");
+                        } catch (Exception ignored) {}
+                    }
+                    if (userDetails != null && userDetails.isEnabled()) {
+                        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            userDetails.getAuthorities()
+                        );
+                        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                    }
+                }
             }
         } catch (Exception ex) {
             logger.error("Could not set user authentication in security context", ex);

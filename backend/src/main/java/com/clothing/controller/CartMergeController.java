@@ -1,12 +1,18 @@
 package com.clothing.controller;
 
+import com.clothing.dto.AddToCartRequest;
 import com.clothing.dto.ApiResponse;
 import com.clothing.dto.CartMergeRequest;
+import com.clothing.entity.Cart;
 import com.clothing.entity.Coupon;
 import com.clothing.entity.Product;
 import com.clothing.repository.CouponRepository;
 import com.clothing.repository.ProductRepository;
+import com.clothing.security.UserPrincipal;
+import com.clothing.service.CartService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -18,10 +24,41 @@ public class CartMergeController {
 
     private final ProductRepository productRepository;
     private final CouponRepository couponRepository;
+    private final CartService cartService;
 
-    public CartMergeController(ProductRepository productRepository, CouponRepository couponRepository) {
+    public CartMergeController(
+        ProductRepository productRepository,
+        CouponRepository couponRepository,
+        CartService cartService
+    ) {
         this.productRepository = productRepository;
         this.couponRepository = couponRepository;
+        this.cartService = cartService;
+    }
+
+    @GetMapping
+    public ResponseEntity<Cart> getCart(@AuthenticationPrincipal UserPrincipal principal) {
+        if (principal == null) {
+            Cart emptyCart = new Cart();
+            emptyCart.setItems(new ArrayList<>());
+            return ResponseEntity.ok(emptyCart);
+        }
+
+        Cart cart = cartService.getOrCreateCartForUser(principal.getId());
+        return ResponseEntity.ok(cart);
+    }
+
+    @PostMapping("/items")
+    public ResponseEntity<Cart> addToCart(
+        @RequestBody AddToCartRequest request,
+        @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        Cart updatedCart = cartService.addItemToCart(principal.getId(), request);
+        return ResponseEntity.ok(updatedCart);
     }
 
     @PostMapping("/validate-and-merge")
@@ -31,7 +68,8 @@ public class CartMergeController {
 
         if (request.getItems() != null) {
             for (CartMergeRequest.GuestCartItem guestItem : request.getItems()) {
-                Optional<Product> optProduct = productRepository.findById(guestItem.getProductId());
+                Optional<Product> optProduct = productRepository.findById(guestItem.getProductId())
+                    .or(() -> productRepository.findByExternalProductId(guestItem.getProductId()));
                 if (optProduct.isPresent()) {
                     Product product = optProduct.get();
                     if (!"ARCHIVED".equalsIgnoreCase(product.getStatus())) {
@@ -39,6 +77,10 @@ public class CartMergeController {
                         BigDecimal unitPrice = product.getBasePrice();
                         BigDecimal itemTotal = unitPrice.multiply(BigDecimal.valueOf(qty));
                         subtotal = subtotal.add(itemTotal);
+
+                        String itemImg = (product.getImages() != null && !product.getImages().isEmpty())
+                            ? product.getImages().get(0).getImageUrl()
+                            : "/images/" + product.getExternalProductId() + ".jpg";
 
                         Map<String, Object> itemMap = new HashMap<>();
                         itemMap.put("id", product.getId() + "-" + guestItem.getSize() + "-" + guestItem.getColor());
@@ -49,9 +91,8 @@ public class CartMergeController {
                         itemMap.put("quantity", qty);
                         itemMap.put("unitPrice", unitPrice);
                         itemMap.put("total", itemTotal);
-                        itemMap.put("image", product.getImages() != null && !product.getImages().isEmpty()
-                            ? product.getImages().get(0).getImageUrl()
-                            : "/images/hero-campaign.jpg");
+                        itemMap.put("image", itemImg);
+                        itemMap.put("imageUrl", itemImg);
                         itemMap.put("slug", product.getSlug());
 
                         validatedItems.add(itemMap);

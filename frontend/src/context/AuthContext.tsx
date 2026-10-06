@@ -81,7 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Check URL params for token (e.g. after Google OAuth redirect from backend)
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const urlToken = urlParams.get('token');
+    const urlToken = urlParams.get('token') || urlParams.get('oauth_token');
 
     if (urlToken) {
       setStoredToken(urlToken);

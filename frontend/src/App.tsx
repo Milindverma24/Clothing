@@ -1,5 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from './lib/queryClient';
 import { ShopProvider, useShop } from './context/ShopContext';
 import { AuthProvider } from './context/AuthContext';
 import { Navbar } from './components/layout/Navbar';
@@ -19,7 +21,7 @@ import { RegisterPage } from './pages/Auth/RegisterPage';
 import { ForgotPasswordPage } from './pages/Auth/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/Auth/ResetPasswordPage';
 import { AdminDashboard } from './pages/Admin/AdminDashboard';
-import { ChatbotWidget } from './components/chat/ChatbotWidget';
+import { AIChatWidget } from './components/AIChatWidget';
 import { AppSplashScreen } from './components/common/AppSplashScreen';
 import { Check } from 'lucide-react';
 
@@ -29,9 +31,9 @@ const ToastNotification: React.FC = () => {
   if (!toastMessage) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 bg-black text-white px-5 py-3 rounded-full text-xs font-semibold shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3 duration-200">
-      <Check className="w-3.5 h-3.5 text-white" />
-      <span>{toastMessage}</span>
+    <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] max-w-[90vw] sm:max-w-md bg-black text-white px-5 py-3 rounded-full text-xs font-semibold shadow-2xl flex items-center gap-2.5 animate-in fade-in slide-in-from-top-4 duration-200 border border-neutral-800 pointer-events-none">
+      <Check className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+      <span className="truncate">{toastMessage}</span>
     </div>
   );
 };
@@ -74,7 +76,7 @@ const AppLayout: React.FC = () => {
       <CartDrawer />
       <AuthModal />
       <ToastNotification />
-      {!isAdmin && <ChatbotWidget />}
+      {!isAdmin && <AIChatWidget />}
 
       {!isAdmin && <Footer />}
     </div>
@@ -83,13 +85,15 @@ const AppLayout: React.FC = () => {
 
 export const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <ShopProvider>
-        <Router>
-          <AppLayout />
-        </Router>
-      </ShopProvider>
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <ShopProvider>
+          <Router>
+            <AppLayout />
+          </Router>
+        </ShopProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 };
 

@@ -146,11 +146,14 @@ public class AiConversationService {
         // 3. Attach RAG Sources
         if (sources != null && !sources.isEmpty()) {
             for (CitationSource src : sources) {
+                String docName = (src.getDocumentName() != null && !src.getDocumentName().isBlank())
+                        ? src.getDocumentName().trim()
+                        : "Store Policy Document";
                 AiMessageSource sourceEntity = new AiMessageSource(
-                        src.getDocumentName(),
-                        src.getPageNumber(),
+                        docName,
+                        src.getPageNumber() != null ? src.getPageNumber() : 1,
                         0.90, // similarity score default
-                        src.getSnippet()
+                        src.getSnippet() != null ? src.getSnippet() : ""
                 );
                 sourceEntity.setMessage(assistantMsg);
                 sourceRepository.save(sourceEntity);
@@ -247,6 +250,18 @@ public class AiConversationService {
         );
 
         return pageResult.map(this::mapToSummaryDTO);
+    }
+
+    /**
+     * Retrieves conversations strictly scoped to the authenticated customer.
+     */
+    @Transactional(readOnly = true)
+    public List<AiConversationSummaryDTO> getUserConversations(Long userId) {
+        if (userId == null) {
+            return Collections.emptyList();
+        }
+        List<AiConversation> convs = conversationRepository.findByUserIdOrderByLastActivityAtDesc(userId);
+        return convs.stream().map(this::mapToSummaryDTO).collect(Collectors.toList());
     }
 
     /**

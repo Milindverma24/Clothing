@@ -14,6 +14,11 @@ public class CouponValidationRequest {
 
     public CouponValidationRequest() {}
 
+    public CouponValidationRequest(String code, BigDecimal cartSubtotal) {
+        this.code = code;
+        this.cartSubtotal = cartSubtotal;
+    }
+
     public String getCode() { return code; }
     public void setCode(String code) { this.code = code; }
 

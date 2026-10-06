@@ -81,6 +81,33 @@ public class Order {
     @Column(name = "return_comment", columnDefinition = "TEXT")
     private String returnComment;
 
+    @Column(name = "refund_amount")
+    private BigDecimal refundAmount;
+
+    @Column(name = "refund_upi_id")
+    private String refundUpiId;
+
+    @Column(name = "refund_reference")
+    private String refundReference;
+
+    @Column(name = "return_tracking_number")
+    private String returnTrackingNumber;
+
+    @Column(name = "pickup_date")
+    private LocalDateTime pickupDate;
+
+    @Column(name = "pickup_address", columnDefinition = "TEXT")
+    private String pickupAddress;
+
+    @Column(name = "approval_type")
+    private String approvalType = "NONE"; // NONE, AUTONOMOUS, ADMIN_PENDING, ADMIN_APPROVED, REJECTED
+
+    @Column(name = "order_source")
+    private String orderSource = "STOREFRONT"; // STOREFRONT, AI_CHATBOT
+
+    @Column(name = "return_source")
+    private String returnSource = "NONE"; // NONE, AI_CONCIERGE, WEB_PORTAL
+
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -134,6 +161,11 @@ public class Order {
     public BigDecimal getTotal() { return total; }
     public void setTotal(BigDecimal total) { this.total = total; }
 
+    @com.fasterxml.jackson.annotation.JsonProperty("totalAmount")
+    public BigDecimal getTotalAmount() {
+        return total != null ? total : BigDecimal.ZERO;
+    }
+
     public String getCouponCode() { return couponCode; }
     public void setCouponCode(String couponCode) { this.couponCode = couponCode; }
 
@@ -161,10 +193,48 @@ public class Order {
     public String getReturnComment() { return returnComment; }
     public void setReturnComment(String returnComment) { this.returnComment = returnComment; }
 
+    public BigDecimal getRefundAmount() { return refundAmount; }
+    public void setRefundAmount(BigDecimal refundAmount) { this.refundAmount = refundAmount; }
+
+    public String getRefundUpiId() { return refundUpiId; }
+    public void setRefundUpiId(String refundUpiId) { this.refundUpiId = refundUpiId; }
+
+    public String getRefundReference() { return refundReference; }
+    public void setRefundReference(String refundReference) { this.refundReference = refundReference; }
+
+    public String getReturnTrackingNumber() { return returnTrackingNumber; }
+    public void setReturnTrackingNumber(String returnTrackingNumber) { this.returnTrackingNumber = returnTrackingNumber; }
+
+    public LocalDateTime getPickupDate() { return pickupDate; }
+    public void setPickupDate(LocalDateTime pickupDate) { this.pickupDate = pickupDate; }
+
+    public String getPickupAddress() { return pickupAddress; }
+    public void setPickupAddress(String pickupAddress) { this.pickupAddress = pickupAddress; }
+
+    public String getApprovalType() { return approvalType; }
+    public void setApprovalType(String approvalType) { this.approvalType = approvalType; }
+
+    public String getOrderSource() { return orderSource != null ? orderSource : "STOREFRONT"; }
+    public void setOrderSource(String orderSource) { this.orderSource = orderSource; }
+
+    public String getReturnSource() { return returnSource != null ? returnSource : "NONE"; }
+    public void setReturnSource(String returnSource) { this.returnSource = returnSource; }
+
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
     public List<OrderItem> items() { return items; }
     public List<OrderItem> getItems() { return items; }
     public void setItems(List<OrderItem> items) { this.items = items; }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("shippingAddressDetails")
+    public java.util.Map<String, String> getShippingAddressDetails() {
+        java.util.Map<String, String> details = new java.util.HashMap<>();
+        details.put("address", shippingAddress != null ? shippingAddress : "");
+        details.put("city", city != null ? city : "");
+        details.put("state", state != null ? state : "");
+        details.put("postalCode", postalCode != null ? postalCode : "");
+        details.put("country", country != null ? country : "India");
+        return details;
+    }
 }
