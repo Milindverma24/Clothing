@@ -4,7 +4,7 @@ A modern, premium clothing e-commerce platform built with React.js and Spring Bo
 
 ⸻
 
-## Overview
+## Overviews
 
 This project is a full-stack clothing e-commerce platform designed for a modern fashion brand.
 
