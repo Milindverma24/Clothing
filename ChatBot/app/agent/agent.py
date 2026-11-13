@@ -85,7 +85,8 @@ class CommerceAgent:
         self,
         request: ChatRequest,
         auth_context: AuthenticationContext,
-        db: AsyncSession
+        db: AsyncSession,
+        guest_session_token: Optional[str] = None
     ) -> ChatResponse:
         start_time = time.time()
         
@@ -108,7 +109,8 @@ class CommerceAgent:
             db=db,
             conversation_id=request.conversation_id,
             session_id=user_identifier,
-            user_id=auth_context.customer_id
+            user_id=auth_context.customer_id,
+            guest_session_token=guest_session_token
         )
         conversation_id = conv.id
 

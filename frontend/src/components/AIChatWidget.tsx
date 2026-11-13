@@ -81,6 +81,7 @@ export const AIChatWidget: React.FC = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Cancellation & Return interactive prompt state
   const [cancellationPromptOrder, setCancellationPromptOrder] = useState<string | null>(null);
@@ -172,6 +173,10 @@ export const AIChatWidget: React.FC = () => {
   };
 
   const handleResetChat = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
     try {
       localStorage.removeItem(`clothing_ai_chat_conv_${clientScopeKey}`);
       localStorage.removeItem(`clothing_ai_chat_msgs_${clientScopeKey}`);

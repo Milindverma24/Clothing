@@ -30,6 +30,7 @@ class Conversation(Base):
     id = Column(String(36), primary_key=True, default=generate_uuid)
     user_id = Column(String(64), nullable=True, index=True)
     session_id = Column(String(64), nullable=False, index=True)
+    guest_session_token = Column(String(64), nullable=True, index=True)
     title = Column(String(255), default="Shopping Assistant")
     status = Column(String(32), default="ACTIVE")  # ACTIVE, ESCALATED, CLOSED
     current_state = Column(String(32), default="IDLE")  # ConversationState

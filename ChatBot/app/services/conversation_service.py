@@ -13,22 +13,30 @@ class ConversationService:
         db: AsyncSession,
         conversation_id: Optional[str] = None,
         session_id: str = "default_session",
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        guest_session_token: Optional[str] = None
     ) -> Conversation:
         if conversation_id:
             stmt = select(Conversation).where(Conversation.id == conversation_id)
             res = await db.execute(stmt)
             conv = res.scalar_one_or_none()
             if conv:
-                if user_id and not conv.user_id:
-                    conv.user_id = user_id
-                conv.last_activity_at = utc_now()
-                return conv
+                # If guest access, verify guest_session_token if bound
+                if not user_id and conv.guest_session_token and guest_session_token:
+                    if conv.guest_session_token != guest_session_token:
+                        # Mismatched capability token -> create new conversation instead of hijacking
+                        conv = None
+                if conv:
+                    if user_id and not conv.user_id:
+                        conv.user_id = user_id
+                    conv.last_activity_at = utc_now()
+                    return conv
 
         # Create new conversation
         new_conv = Conversation(
             session_id=session_id,
             user_id=user_id,
+            guest_session_token=guest_session_token if not user_id else None,
             status="ACTIVE",
             current_state=ConversationState.IDLE.value
         )
